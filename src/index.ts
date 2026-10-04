@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
+import { getJargonResult, processTranscript } from "./jargon";
 import {
   countParticipants,
   createSession,
@@ -129,16 +130,35 @@ app.post("/i/:token", async (c) => {
   );
 });
 
-const organizerView = async (db: D1Database, session: Session, token: string) => {
+const organizerView = async (db: D1Database, session: Session, token: string, message?: { error?: string; ok?: string }) => {
   const count = await countParticipants(db, session.id);
+  const jargon = session.locked_at ? await getJargonResult(db, session.id) : [];
   return page(
     "Organizer",
     html`<h1>Organizer: Session ${session.id}</h1>
       <p>Pick Count: ${session.pick_count}</p>
       <p>Participants: ${count}</p>
+      ${message?.error ? html`<p role="alert">${message.error}</p>` : ""}
+      ${message?.ok ? html`<p role="status">${message.ok}</p>` : ""}
       ${session.locked_at
-        ? html`<p>This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted.</p>`
-        : html`<form method="post" action="/o/${token}/lock"><button type="submit">Lock Session</button></form>`}`,
+        ? html`<p>This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted.</p>
+            <h2>Upload Transcript</h2>
+            <p>Upload a .txt or .vtt file. It is read in memory and discarded; only counts for words and phrases Participants picked are kept. Uploading again replaces the previous Jargon Result.</p>
+            <form method="post" action="/o/${token}/transcript" enctype="multipart/form-data">
+              <input type="file" name="transcript" accept=".txt,.vtt" required />
+              <button type="submit">Upload Transcript</button>
+            </form>
+            <h2>Jargon Result</h2>
+            ${jargon.length === 0
+              ? html`<p>No Jargon Result yet (or no picked term was said).</p>`
+              : html`<table>
+                  <thead><tr><th>Term</th><th>Occurrences</th></tr></thead>
+                  <tbody>
+                    ${jargon.map((j) => html`<tr><td>${j.term}</td><td>${j.occurrences}</td></tr>`)}
+                  </tbody>
+                </table>`}`
+        : html`<form method="post" action="/o/${token}/lock"><button type="submit">Lock Session</button></form>
+            <p>Lock the Session to upload a Transcript.</p>`}`,
   );
 };
 
@@ -155,6 +175,28 @@ app.post("/o/:token/lock", async (c) => {
   const session = await lockSession(c.env.DB, token);
   if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
   return c.html(await organizerView(c.env.DB, session, token));
+});
+
+// Only an Organizer Link token can upload; the Session must be locked first (picks are final).
+app.post("/o/:token/transcript", async (c) => {
+  const token = c.req.param("token");
+  const session = await findByOrganizerToken(c.env.DB, token);
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session.locked_at) {
+    return c.html(
+      await organizerView(c.env.DB, session, token, { error: "Lock the Session before uploading a Transcript." }),
+      409,
+    );
+  }
+  let file: unknown;
+  try {
+    file = (await c.req.parseBody())["transcript"];
+  } catch {
+    return c.html(await organizerView(c.env.DB, session, token, { error: "Could not read the upload." }), 400);
+  }
+  const res = await processTranscript(c.env.DB, session.id, file);
+  if (!res.ok) return c.html(await organizerView(c.env.DB, session, token, { error: res.error }), 400);
+  return c.html(await organizerView(c.env.DB, session, token, { ok: "Transcript processed and discarded. Jargon Result updated." }));
 });
 
 export default app;
