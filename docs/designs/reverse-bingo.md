@@ -8,12 +8,14 @@ Mode: Builder (with explicit business-model rigor per user request)
 
 ## Problem Statement
 
-A "reversed bingo" for meetings. Instead of ticking off words as they're heard, participants predict the words that will come up **before** a meeting, filling a 3x3 or 5x5 grid (or a ranked "top words" list). After the meeting, the real transcript is analyzed (filler words ignored), participants are scored against what was actually said, and ranked on a leaderboard. Working names: MumbahJumbah (mumbahjumbah.com) or BlahJack (blahjack.com).
+A "reversed bingo" for meetings. Instead of ticking off words as they're heard, participants predict the words that will come up **before** a session, filling a grid of picks (any pick count, no fixed shape). After the session, the real transcript is analyzed (filler words ignored), participants are scored against what was actually said, and ranked on a leaderboard. Working names: MumbahJumbah (mumbahjumbah.com) or BlahJack (blahjack.com).
+
+**Terminology note:** the domain term for a single scored event is **Session** (see `CONTEXT.md`) — deliberately general, since the facilitator business model (below) extends this to workshops and offsite icebreakers that aren't meetings in the video-call sense. "Meeting" remains fine as marketing language describing the product's primary use case.
 
 ## What Makes This Cool
 
 Two distinct "whoa" moments, confirmed in this session as both mattering, with different jobs:
-- **The live reveal (the hook):** right after the meeting, scores animate in — who called it, who went bold and got burned, who nailed the leaderboard. This is what gets a team to do it again next week.
+- **The live reveal (the hook):** right after the session, scores animate in — who called it, who went bold and got burned, who nailed the leaderboard. This is what gets a team to do it again next week.
 - **The jargon insights report (the retention/distribution engine):** a shareable, "Spotify Wrapped"-style recap of team buzzword trends over time — the artifact people screenshot and post in Slack. This is the part the user is actually most excited about building — chosen explicitly over the live-reveal-only framing and the running-rivalry framing.
 - **Longer-term "whoa" (from cross-model second opinion, not yet validated):** a cross-team/cross-company anonymized "buzzword weather report" — e.g. "synergy" down 40% this quarter, "AI-native" up 300%. Unlike a single team's novelty, this gets *more* interesting with scale, which structurally solves the novelty-fade problem the user's own research already flagged.
 
@@ -29,9 +31,9 @@ Two distinct "whoa" moments, confirmed in this session as both mattering, with d
 1. No existing product combines predict-then-reveal scoring with a jargon insight report — this is a real gap in the landscape (desk research found category A: free buzzword generators, B: general card makers, C: hosted live-event platforms like Crowdpurr/Bingo Maker, D: callers/utilities, E: real-money/social-casino bingo — none do the "reverse" mechanic). Not a saturated space.
 2. **(Revised during session)** Both the live reveal and the jargon report matter, but for different jobs: the live reveal is the acquisition/viral hook (the in-the-moment leaderboard reveal); the jargon report is what drives retention and makes the product shareable afterward. Neither dominates — they're sequential, not competing.
 3. Individuals won't pay for this as a novelty. Money has to come from team/company engagement budgets, not per-player fees — consistent with the user's own research conclusion ("businesses with engagement budgets are the better bet").
-4. Fastest validation path is dogfooding with the user's own team/meetings, not a cold launch to strangers or a niche community.
+4. Fastest validation path is dogfooding with the user's own team/sessions, not a cold launch to strangers or a niche community.
 5. A clear "we don't store your transcripts" (or equivalent) privacy promise is a selling point given jargon-tracking's surveillance-adjacent feel.
-6. **(User-added, post-alternatives)** The full product vision — persistence, recurring team leaderboards, and the cross-team jargon index — should be designed up front, not cut for lack of current scale or unresolved privacy questions. The first build intentionally starts quasi-private (the user as sole link-generator/operator) specifically so the full vision can be tested without needing real-world scale or multi-tenant privacy answers yet.
+6. **(User-added, post-alternatives)** The full product vision — persistence, recurring team leaderboards, and the cross-team jargon index — should be designed up front, not cut for lack of current scale or unresolved privacy questions. The first build intentionally starts quasi-private (the user as sole link-generator/Operator) specifically so the full vision can be tested without needing real-world scale or multi-tenant privacy answers yet.
 
 ## Cross-Model Perspective
 
@@ -50,7 +52,7 @@ This did not challenge any of the 5 original premises — it reinforced #2 and #
 Single-page app: create grid + invite link, upload `.txt`/`.vtt` transcript, frequency-match scoring, leaderboard table, one shareable PNG recap card. No auth, no billing, no trend history. Effort S, Risk Low. Fastest to real feedback; con is no persistence (no recurring-league hook) and file-upload friction for non-technical coworkers.
 
 ### Approach B: Team Ritual Platform
-Same core loop, but with accounts/workspaces, meeting history, recurring leaderboards, and saved recap cards from day one — the "freemium for teams" business model built into the architecture up front. Effort L, Risk Medium. Validates retention directly but delays the first real test while building infra for an unvalidated idea.
+Same core loop, but with accounts/workspaces, session history, recurring leaderboards, and saved recap cards from day one — the "freemium for teams" business model built into the architecture up front. Effort L, Risk Medium. Validates retention directly but delays the first real test while building infra for an unvalidated idea.
 
 ### Approach C: Cross-Team Jargon Index
 Skip single-team framing; build toward the aggregated "buzzword weather report" across many teams/companies from the start. Effort XL, Risk High. Strong distribution angle but needs usage volume the project doesn't have yet, and raises cross-company privacy questions before any public version.
@@ -61,22 +63,22 @@ Skip single-team framing; build toward the aggregated "buzzword weather report" 
 
 **Merged: full vision documented, build starts quasi-private (Approach A+).**
 
-The product vision spans all three approaches — single-meeting predict/reveal scoring (A), persistent team rituals with recurring leaderboards and history (B), and eventually a cross-team jargon index (C). The user explicitly does not want to cut the ambition of B/C just because of current no-scale or privacy open questions.
+The product vision spans all three approaches — single-session predict/reveal scoring (A), persistent team rituals with recurring leaderboards and history (B), and eventually a cross-team jargon index (C). The user explicitly does not want to cut the ambition of B/C just because of current no-scale or privacy open questions.
 
-The build order is scoped down, not the vision: start with a quasi-private v1 where the user is the sole operator (the only person generating links/running meetings, across their own team's real meetings), but design the data model so it extends into B (multi-team accounts, history) and eventually C (cross-team aggregation) without a rebuild. Concretely: from day one, persist meetings, grids/picks, and transcripts-derived word-frequency results as structured rows (not as a stateless/ephemeral request) scoped by a `team_id`/`operator_id` even though there's only one operator right now — this is what makes B an additive feature (multi-tenant accounts) rather than a rewrite, and makes C additive later (an aggregation query over existing rows) rather than a new system.
+The build order is scoped down, not the vision: start with a quasi-private v1 where the user is the sole Operator and Organizer (the only person generating links/running sessions, across their own team's real meetings), but design the data model so it extends into B (multi-team accounts, history) and eventually C (cross-team aggregation) without a rebuild. Concretely: from day one, persist Sessions, Grids/Picks, and transcript-derived term-frequency results (Jargon Results) as structured rows (not as a stateless/ephemeral request) scoped by a real `operator_id` foreign key to a real **Operator** table — one row in v1, not a hardcoded constant — even though there's only one Operator right now. This is what makes B an additive feature (new Operator rows, multi-tenant accounts) rather than a rewrite (retrofitting a table that never existed and backfilling every prior row), and makes C additive later (an aggregation query over existing rows) rather than a new system.
 
-First build scope (v1, quasi-private). Effort S/M, Risk Low (same ballpark as Approach A, plus a small amount of schema-design care for the operator/team-scoped persistence):
-- Create a grid + invite link (link-based entry, no accounts yet — the user is the only "organizer"). The organizer picks grid size (3x3 or 5x5) when creating the link for that meeting; it applies to all participants in that meeting. Each participant enters a display name when they open the link and submit their grid; name + picks together identify their leaderboard row for that meeting (no login, no email verification in v1). Cross-meeting identity reconciliation (recognizing the same person across separate meetings, needed for Approach B's recurring history) is an acknowledged unresolved prerequisite — a freely-retyped display name cannot guarantee this, and v1 does not yet solve it.
-- Picks lock when the organizer starts the meeting (or at a time the organizer sets when creating the link) — no submissions or edits accepted after that point, enforcing the "predict before you know" premise even informally for a trusted single-team v1.
-- Grid input is free text per cell (not a picklist, to keep predictions genuinely personal). Picks are normalized (lowercase, trimmed) before storage — this normalization is separate from, and simpler than, the transcript-side word-variant question in Open Questions.
-- Upload a `.txt`/`.vtt` transcript after the meeting. `.vtt` requires a real (if small) parsing step — stripping WebVTT timestamps, cue identifiers, and speaker labels — before frequency counting can run; this is distinct from, and in addition to, the stopword-filtering/frequency-count logic itself.
-- The raw uploaded transcript file is processed in memory and discarded immediately after word-frequency extraction — it is never persisted to disk or a database. Only the derived frequency/jargon results are stored. This operationalizes half of the "we don't store your transcripts" promise from Constraints; the other half — that persisted frequency data could itself surface a sensitive rare term (a codename, a competitor's name) — is handled by policy, not code: single-meeting recap cards stay internal/opt-in and are never sold or shown to management as surveillance data (see Business Model's "never per-team surveillance" rule), which is the actual safeguard rather than filtering the data itself.
-- Stopword-filtered word-frequency match against each participant's picks. Score per picked word = the word's raw occurrence count in the transcript (summed across all picks that appear at least once, after stopword filtering) — i.e. a word said 20 times is worth more than one said twice. v1 ships with this plain frequency-match scoring only; the "bold-guess bonus" (extra points for words few other players picked) is deferred past v1 — see Open Questions for why a first-pass formula isn't specified yet.
-- Leaderboard table, ranked by score descending, with ties (at any score, including zero) broken by submission order. A participant whose picks match zero transcript words still appears on the leaderboard with a score of 0, ranked last — they are not excluded.
-- One shareable PNG recap card (via `@vercel/og` or `satori`) generated from that single meeting's transcript — a single-meeting word-frequency snapshot, not the longitudinal trends-over-time report described in "What Makes This Cool." The trends-over-time version only becomes possible once multiple meetings accumulate under the persisted data model (see Next Steps).
-- Data persisted (not stateless) so meeting history exists from day one, even with a single operator.
+First build scope (v1, quasi-private). Effort S/M, Risk Low (same ballpark as Approach A, plus a small amount of schema-design care for the Operator-scoped persistence):
+- Create a Session (link-based entry, no accounts yet — the user is the only "Organizer"), which generates two distinct links: a public **Invite Link** for participants to submit a Grid, and a private, unguessable **Organizer Link** that alone can start/lock the Session or upload its transcript — since there's no login at all in v1, link-secrecy is the only thing gating Organizer actions. A later phase replaces this with real authenticated access and audit logging of Organizer actions. The Organizer picks a **Pick Count** when creating the Session (e.g. 9 or 25 as suggested presets — any positive integer is valid, since scoring has no row/column/line concept and doesn't require a perfect square); it applies to all participants in that session. Each participant enters an **email** (the stable cross-session identity key, unverified/trusted in v1 — no login, no magic link) and a **display name** (cosmetic, freely editable per session, never used for matching) when they open the link and submit their Grid. Email is chosen specifically because it's the same claim a future SSO provider (Google/Microsoft Workspace) verifies, so later phases add a `verified_via` flag and an OAuth step on top of the same field without re-keying historical data — see [ADR-0001](../adr/0001-email-as-identity-key.md). This resolves the cross-session identity reconciliation gap flagged in R2-1.
+- Picks lock when the Organizer starts the session (or at a time the Organizer sets when creating the link) — no submissions or edits accepted after that point, enforcing the "predict before you know" premise even informally for a trusted single-team v1. Before lock, a participant may resubmit their Grid; this upserts their existing Grid for that (email, session) pair rather than creating a duplicate leaderboard row — last submission before lock wins.
+- Grid input is free text per cell (not a picklist, to keep predictions genuinely personal). Picks are normalized (lowercase, trimmed) before storage — this normalization is separate from, and simpler than, the transcript-side word-variant question in Open Questions. Picks within one Grid must be unique; a duplicate term is rejected at submission (not silently deduped), so repeating a safe bet across cells can't inflate a score — each cell must be a distinct guess.
+- Upload a `.txt`/`.vtt` transcript after the session. `.vtt` requires a real (if small) parsing step — stripping WebVTT timestamps, cue identifiers, and speaker labels — before frequency counting can run; this is distinct from, and in addition to, the stopword-filtering/frequency-count logic itself. Upload is retryable, not one-shot — a failed parse (corrupt file, empty content) or a wrong upload doesn't lock the session; the Organizer can upload again via the Organizer Link.
+- The raw uploaded transcript file is processed in memory and discarded immediately after term-frequency extraction — it is never persisted to disk or a database. Only the derived Jargon Result is stored, and that stored result is scoped to the terms participants actually picked — not an arbitrary "top N terms said in the session" list. This closes the gap flagged in R2-7: a sensitive rare term (a codename, a competitor's name) can only surface in persisted data if someone picked it, which is self-inflicted, consensual disclosure rather than an incidental leak. The policy safeguard (recap cards stay internal/opt-in, never shown to management as surveillance data — see Business Model's "never per-team surveillance" rule) still applies on top of this as a second layer, but the privacy promise is no longer policy-only.
+- Term-frequency match against each participant's Picks, where a Pick may be a single word or a multi-word phrase (e.g. "move the needle"). Score per picked term = the term's raw occurrence count in the transcript (summed across all Picks that appear at least once) — i.e. a term said 20 times is worth more than one said twice. Stopword filtering applies only to single-word Picks; a multi-word phrase is matched as-is, since the stopwords it contains are part of the meaningful unit. All matching is boundary-aware tokenized matching, not raw substring search — a single-word Pick matches only a whole token, and a phrase Pick matches only a contiguous run of whole tokens, so e.g. "AI" never matches inside "said" or "campaign". v1 ships with this plain frequency-match scoring only; the "bold-guess bonus" (extra points for terms few other players picked) is deferred past v1 — see Open Questions for why a first-pass formula isn't specified yet.
+- Leaderboard table, ranked by score descending, with ties (at any score, including zero) broken by submission order. A participant whose Picks match zero transcript terms still appears on the leaderboard with a score of 0, ranked last — they are not excluded. If zero participants submitted a Grid before lock, there are no Picks to match against, so the Jargon Result (and the leaderboard and Recap Card built from it) comes out empty — a valid, if anticlimactic, outcome. This isn't blocked or treated as an error; the Organizer can still upload a transcript on an empty session.
+- One shareable PNG Recap Card (via `@vercel/og` or `satori`) generated from that single session's Jargon Result, showing two things: the leaderboard (participants ranked by score) and a "top terms" strip (picked terms ranked by raw occurrence count). Both draw from the same Jargon Result — the top-terms strip is never an unscoped "most-said words in the session" view, since that would reopen the R2-7 privacy gap (a term can only appear if someone picked it). This is a single-session term-frequency snapshot, not the longitudinal trends-over-time report described in "What Makes This Cool." The trends-over-time version only becomes possible once multiple sessions accumulate under the persisted data model (see Next Steps).
+- Data persisted (not stateless) so session history exists from day one, even with a single Operator.
 
-v1's "reveal" is a static leaderboard + recap card appearing after transcript upload — there is no live animation. Success Criteria's "live-reveal moment" below refers to this static reveal, not the animated version described in "What Makes This Cool," which stays a later-phase idea.
+v1's "reveal" is a static leaderboard + Recap Card appearing after transcript upload — there is no live animation. Success Criteria's "live-reveal moment" below refers to this static reveal, not the animated version described in "What Makes This Cool," which stays a later-phase idea.
 
 Explicitly deferred to later phases, once the private test proves the loop: live-reveal animation, the bold-guess bonus formula, multi-team accounts/auth, billing, fuzzy/stemmed word matching, cross-team aggregation (Approach C), live platform integrations.
 
@@ -90,7 +92,7 @@ Explicitly deferred to later phases, once the private test proves the loop: live
 
 ## Success Criteria
 
-v1 is "done" when: the user has run it in at least one real meeting with their own team, generated a leaderboard and a shareable recap card from a real transcript upload, and judged — from their own reaction and their coworkers' reaction — whether the static leaderboard reveal (v1's actual reveal experience, not the deferred animated version) and the recap card actually produced delight, not just functioned correctly.
+v1 is "done" when: the user has run it in at least one real session with their own team, generated a leaderboard and a shareable Recap Card from a real transcript upload, and judged — from their own reaction and their coworkers' reaction — whether the static leaderboard reveal (v1's actual reveal experience, not the deferred animated version) and the Recap Card actually produced delight, not just functioned correctly.
 
 ## Distribution Plan
 
@@ -102,7 +104,7 @@ Web service (link-based access), no app-store or package distribution needed for
 
 ### Primary direction: facilitator/consultant white-label
 
-**The bet:** sell to agile coaches, offsite facilitators, and corporate trainers who already run paid icebreaker/engagement sessions and bill clients $500-5,000/day for them — not to the HR department of the team being measured. A $30-100/month white-label pack (custom branding, pre-built industry word banks, export-ready recap decks they drop into their own client deliverables) is billable to their own clients immediately, so the sales cycle is fast and willingness-to-pay is already proven — unlike internal culture-budget sales, which face slow procurement and low willingness-to-pay for novelty.
+**The bet:** sell to agile coaches, offsite facilitators, and corporate trainers who already run paid icebreaker/engagement sessions and bill clients $500-5,000/day for them — not to the HR department of the team being measured. A $30-100/month **White-Label** pack (custom branding, pre-built industry word banks, export-ready **Recap Decks** — plain bundles of Recap Cards, no extra deck-level design — they drop into their own client deliverables) is billable to their own clients immediately, so the sales cycle is fast and willingness-to-pay is already proven — unlike internal culture-budget sales, which face slow procurement and low willingness-to-pay for novelty. Here, the facilitator is the **Operator**; they are the ones who self-brand (MumbahJumbah doesn't brand it for them), and each client engagement is one or more **Sessions** under that Operator.
 
 Why this is the bet over the others: validation path matches Approach A+ exactly (dogfood with your own team first), and realistic early ceiling is a genuine recurring-revenue target consistent with market comparables — roughly 50 facilitators x $30-100/mo = $1.5-5K MRR within a year (same ballpark as Crowdpurr's and Bingo Card Creator's solo/small-team outcomes, but reached through a buyer who converts faster).
 
@@ -135,8 +137,8 @@ Research caveat carried forward: individuals rarely pay for novelty tools (desk 
 
 ## Next Steps
 
-1. Build the v1 loop (grid + link, transcript upload, scoring, leaderboard, shareable PNG card) scoped as Approach A+ above — structured persistence from day one, single operator.
-2. Dogfood with your own team in a real meeting; collect your own and coworkers' reactions to both the live-reveal moment and the recap card.
+1. Build the v1 loop (grid + link, transcript upload, scoring, leaderboard, shareable PNG card) scoped as Approach A+ above — structured persistence from day one, single Operator.
+2. Dogfood with your own team in a real session; collect your own and coworkers' reactions to both the live-reveal moment and the Recap Card.
 3. Decide on word-variant handling and the bold-guess bonus formula based on what real transcripts actually look like, not in the abstract.
 4. Revisit the consensus/override mechanism for mis-flagged top words after a few real runs surface concrete examples.
 5. Only after the private dogfood loop proves delight: decide whether to open it to a second team (first step toward Approach B's multi-tenant model) and whether usage volume justifies starting on the cross-team jargon index (Approach C).
@@ -157,6 +159,8 @@ Stop: CONVERGENCE
 
 ### R2-1 — feasibility
 
+**Resolved** (2026-10-04, `/grill-with-docs` session): participant identity is now **email** (unverified, trusted in v1), with **display name** kept as a separate cosmetic field. See [ADR-0001](../adr/0001-email-as-identity-key.md) and `CONTEXT.md`.
+
 **Problem**
 
 > Participant identity in v1 is only a free-text display name entered on link-open ('name + picks together identify their leaderboard row'), with no stable identifier, no uniqueness check, and no login. This allows two participants in the same meeting to collide on an identical display name (ambiguous leaderboard rows), and more importantly undermines the architectural rationale given for the Recommended Approach: persisting rows scoped by team_id/operator_id from day one is justified specifically so Approach B's 'recurring team leaderboards' and history become additive rather than a rewrite — but that only works if the same person's identity is consistently linkable across separate meetings, which a freely-retyped display name cannot guarantee (e.g. 'Alex' vs 'alex' vs 'Alexandra' in two different weeks).
@@ -166,6 +170,8 @@ Stop: CONVERGENCE
 > Either specify a lightweight stable-identity mechanism for v1 (e.g., a per-participant token embedded in a personalized link, or a required-unique-within-meeting name check) that will actually support cross-meeting linkage for Approach B, or explicitly acknowledge in the document that cross-meeting identity reconciliation is an unresolved prerequisite for Approach B and is not yet solved by the current data model.
 
 ### R2-2 — clarity
+
+**Resolved** (prior revision, body text already states "ties at any score, including zero" broken by submission order).
 
 **Problem**
 
@@ -177,6 +183,8 @@ Stop: CONVERGENCE
 
 ### R2-3 — clarity
 
+**Resolved** (prior revision, body text states the exact rule; refined further in this session to cover multi-word phrase picks and boundary-aware matching — see `CONTEXT.md`'s Score/Jargon Result definitions).
+
 **Problem**
 
 > 'v1 ships with plain frequency-match scoring only' names the mechanism but not its arithmetic: it is not stated whether a participant's score per matched word is the word's raw occurrence count in the transcript, a capped/binary value (1 point per matched word regardless of how often it was said), or something else. This is the core v1 scoring computation and is left ambiguous for the next engineering review.
@@ -186,6 +194,8 @@ Stop: CONVERGENCE
 > State the exact per-word scoring rule for v1 (e.g., 'score = sum of transcript occurrence counts for each picked word that appears at least once, after stopword filtering').
 
 ### R2-4 — completeness
+
+**Resolved, superseded** (2026-10-04, `/grill-with-docs` session): the original remedy's "3x3 or 5x5 grid size" framing was itself replaced — scoring has no row/column/line concept, so the square-grid constraint was unnecessary. The organizer now sets a **Pick Count** (any positive integer; 9/25 are suggested presets, not requirements). See `CONTEXT.md`'s Pick Count definition.
 
 **Problem**
 
@@ -197,6 +207,8 @@ Stop: CONVERGENCE
 
 ### R2-5 — completeness
 
+**Resolved** (prior revision, body text states picks lock at organizer-controlled session start/set time; refined in this grilling session to clarify pre-lock resubmission upserts rather than duplicating).
+
 **Problem**
 
 > No cutoff or lock is specified for when participant grid submissions close relative to the meeting. Since the invite link flow and submission mechanism don't mention disabling further submission/edits once the meeting starts, a participant could in principle submit or revise picks during or after the meeting (before transcript upload), undermining the core 'predict before you know' premise the entire game mechanic depends on.
@@ -207,6 +219,8 @@ Stop: CONVERGENCE
 
 ### R2-6 — consistency
 
+**Resolved** (prior revision, body text explicitly disambiguates the v1 Recap Card as a single-session snapshot from the longitudinal trends-over-time report).
+
 **Problem**
 
 > 'What Makes This Cool' defines the jargon insights report as a 'Spotify Wrapped'-style recap of 'team buzzword trends over time' — explicitly the part the user is 'most excited about building' and chose over the live-reveal-dominant framing. But the Recommended Approach's v1 scope only produces 'one shareable PNG recap card' generated from a single meeting's transcript, and Success Criteria only requires one real meeting to be run. A single-meeting frequency card cannot show trends over time (that requires meeting history, which v1 won't have until multiple meetings accumulate). The document labels this single-meeting card as fulfilling 'the jargon-insights artifact' without disambiguating it from the trends-over-time report that was the actual basis for the user's prioritization choice.
@@ -216,6 +230,8 @@ Stop: CONVERGENCE
 > Clarify that v1's recap card is a single-meeting word-frequency snapshot, not the longitudinal trends-over-time report described in 'What Makes This Cool', and state that the trends-over-time version only becomes possible after multiple meetings accumulate under the persisted data model (or state explicitly which specific trend view, if any, v1's recap card is meant to approximate).
 
 ### R2-7 — completeness
+
+**Resolved** (2026-10-04, `/grill-with-docs` session): persisted Jargon Results are scoped to picked words only, not an arbitrary top-N list, so a sensitive term can only surface if someone picked it. See `CONTEXT.md`'s Jargon Result definition.
 
 **Problem**
 
