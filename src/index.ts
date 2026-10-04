@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
+import { saveGrid, validateGrid } from "./grids";
 import { createSession, findByInviteToken, findByOrganizerToken, parsePickCount } from "./sessions";
 
 export type Bindings = { DB: D1Database };
@@ -60,11 +61,58 @@ app.post("/sessions", async (c) => {
   );
 });
 
-// Placeholders: real behavior arrives in Slices 2 (Invite Link) and 3 (Organizer Link).
+type FormValues = { email?: string; display_name?: string; picks?: string[] };
+
+const gridForm = (pickCount: number, v: FormValues = {}, error?: string) =>
+  html`<h1>Submit your Grid</h1>
+    <p>Predict ${pickCount} words or phrases you expect to hear. Each must be different.</p>
+    ${error ? html`<p role="alert">${error}</p>` : ""}
+    <form method="post">
+      <label>Email <input type="email" name="email" value="${v.email ?? ""}" required /></label>
+      <label>Display Name <input type="text" name="display_name" value="${v.display_name ?? ""}" required /></label>
+      <ol>
+        ${Array.from(
+          { length: pickCount },
+          (_, i) => html`<li><input type="text" name="pick" value="${v.picks?.[i] ?? ""}" required /></li>`,
+        )}
+      </ol>
+      <button type="submit">Submit Grid</button>
+    </form>`;
+
 app.get("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
-  return c.html(page("Session", html`<h1>Session ${session.id}</h1><p>Pick Count: ${session.pick_count}</p>`));
+  if (session.locked_at) return c.html(page("Session locked", html`<h1>Session ${session.id} is locked</h1>`), 403);
+  return c.html(page(`Session ${session.id}`, html`<p>Session ${session.id}</p>${gridForm(session.pick_count)}`));
+});
+
+app.post("/i/:token", async (c) => {
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (session.locked_at) return c.html(page("Session locked", html`<h1>Session ${session.id} is locked</h1>`), 403);
+  const raw = await c.req.parseBody({ all: true });
+  const result = validateGrid(raw, session.pick_count);
+  if (!result.ok) {
+    const picks = [raw["pick"]].flat().filter((p): p is string => typeof p === "string");
+    const values = {
+      email: typeof raw["email"] === "string" ? raw["email"] : "",
+      display_name: typeof raw["display_name"] === "string" ? raw["display_name"] : "",
+      picks,
+    };
+    return c.html(
+      page(`Session ${session.id}`, html`<p>Session ${session.id}</p>${gridForm(session.pick_count, values, result.error)}`),
+      400,
+    );
+  }
+  await saveGrid(c.env.DB, session.id, result.value);
+  return c.html(
+    page(
+      "Grid submitted",
+      html`<h1>Grid submitted</h1>
+        <p>Thanks, ${result.value.displayName}. Your ${session.pick_count} picks are saved. Resubmit with the same email to change them.</p>
+        <p><a href="">Edit your Grid</a></p>`,
+    ),
+  );
 });
 
 app.get("/o/:token", async (c) => {
