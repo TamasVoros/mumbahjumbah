@@ -1,7 +1,15 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
-import { createSession, findByInviteToken, findByOrganizerToken, parsePickCount } from "./sessions";
+import {
+  countParticipants,
+  createSession,
+  findByInviteToken,
+  findByOrganizerToken,
+  lockSession,
+  parsePickCount,
+  type Session,
+} from "./sessions";
 
 export type Bindings = { DB: D1Database };
 
@@ -61,6 +69,12 @@ app.post("/sessions", async (c) => {
   );
 });
 
+const lockedPage = (session: Session) =>
+  page(
+    "Session locked",
+    html`<h1>Session ${session.id} is locked</h1><p>The Organizer has locked this Session, so Grids can no longer be submitted or changed.</p>`,
+  );
+
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
 
 const gridForm = (pickCount: number, v: FormValues = {}, error?: string) =>
@@ -82,14 +96,14 @@ const gridForm = (pickCount: number, v: FormValues = {}, error?: string) =>
 app.get("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
-  if (session.locked_at) return c.html(page("Session locked", html`<h1>Session ${session.id} is locked</h1>`), 403);
+  if (session.locked_at) return c.html(lockedPage(session), 403);
   return c.html(page(`Session ${session.id}`, html`<p>Session ${session.id}</p>${gridForm(session.pick_count)}`));
 });
 
 app.post("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
-  if (session.locked_at) return c.html(page("Session locked", html`<h1>Session ${session.id} is locked</h1>`), 403);
+  if (session.locked_at) return c.html(lockedPage(session), 403);
   const raw = await c.req.parseBody({ all: true });
   const result = validateGrid(raw, session.pick_count);
   if (!result.ok) {
@@ -115,12 +129,32 @@ app.post("/i/:token", async (c) => {
   );
 });
 
-app.get("/o/:token", async (c) => {
-  const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
-  return c.html(
-    page("Organizer", html`<h1>Organizer: Session ${session.id}</h1><p>Pick Count: ${session.pick_count}</p>`),
+const organizerView = async (db: D1Database, session: Session, token: string) => {
+  const count = await countParticipants(db, session.id);
+  return page(
+    "Organizer",
+    html`<h1>Organizer: Session ${session.id}</h1>
+      <p>Pick Count: ${session.pick_count}</p>
+      <p>Participants: ${count}</p>
+      ${session.locked_at
+        ? html`<p>This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted.</p>`
+        : html`<form method="post" action="/o/${token}/lock"><button type="submit">Lock Session</button></form>`}`,
   );
+};
+
+app.get("/o/:token", async (c) => {
+  const token = c.req.param("token");
+  const session = await findByOrganizerToken(c.env.DB, token);
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  return c.html(await organizerView(c.env.DB, session, token));
+});
+
+// Only an Organizer Link token can lock; Invite Link tokens never match here.
+app.post("/o/:token/lock", async (c) => {
+  const token = c.req.param("token");
+  const session = await lockSession(c.env.DB, token);
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  return c.html(await organizerView(c.env.DB, session, token));
 });
 
 export default app;

@@ -48,3 +48,22 @@ export function findByInviteToken(db: D1Database, token: string) {
 export function findByOrganizerToken(db: D1Database, token: string) {
   return db.prepare("SELECT * FROM sessions WHERE organizer_link_token = ?").bind(token).first<Session>();
 }
+
+export async function countParticipants(db: D1Database, sessionId: number): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM participants WHERE session_id = ?")
+    .bind(sessionId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/** Idempotent: the first lock timestamp is kept. Returns the session, or null for an unknown Organizer token. */
+export function lockSession(db: D1Database, organizerToken: string) {
+  return db
+    .prepare(
+      `UPDATE sessions SET locked_at = COALESCE(locked_at, datetime('now'))
+       WHERE organizer_link_token = ? RETURNING *`,
+    )
+    .bind(organizerToken)
+    .first<Session>();
+}
