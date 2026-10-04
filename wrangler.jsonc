@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mumbahjumbah",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mumbahjumbah",
+      "database_id": "e8fd6db9-03c5-4dba-8df9-e25de8ba3e7a",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
