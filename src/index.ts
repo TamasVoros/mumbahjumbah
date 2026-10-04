@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
+import { getLeaderboard } from "./leaderboard";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
   countParticipants,
@@ -73,7 +74,8 @@ app.post("/sessions", async (c) => {
 const lockedPage = (session: Session) =>
   page(
     "Session locked",
-    html`<h1>Session ${session.id} is locked</h1><p>The Organizer has locked this Session, so Grids can no longer be submitted or changed.</p>`,
+    html`<h1>Session ${session.id} is locked</h1><p>The Organizer has locked this Session, so Grids can no longer be submitted or changed.</p>
+      <p><a href="/i/${session.invite_link_token}/leaderboard">View the leaderboard</a></p>`,
   );
 
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
@@ -138,6 +140,7 @@ const organizerView = async (db: D1Database, session: Session, token: string, me
     html`<h1>Organizer: Session ${session.id}</h1>
       <p>Pick Count: ${session.pick_count}</p>
       <p>Participants: ${count}</p>
+      ${session.locked_at ? html`<p><a href="/o/${token}/leaderboard">View the leaderboard</a></p>` : ""}
       ${message?.error ? html`<p role="alert">${message.error}</p>` : ""}
       ${message?.ok ? html`<p role="status">${message.ok}</p>` : ""}
       ${session.locked_at
@@ -197,6 +200,43 @@ app.post("/o/:token/transcript", async (c) => {
   const res = await processTranscript(c.env.DB, session.id, file);
   if (!res.ok) return c.html(await organizerView(c.env.DB, session, token, { error: res.error }), 400);
   return c.html(await organizerView(c.env.DB, session, token, { ok: "Transcript processed and discarded. Jargon Result updated." }));
+});
+
+const leaderboardPage = async (db: D1Database, session: Session) => {
+  const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
+  return page(
+    "Leaderboard",
+    html`<h1>Leaderboard: Session ${session.id}</h1>
+      ${jargon.length === 0
+        ? html`<p>No Jargon Result yet (or no picked term was said), so everyone is at 0 for now.</p>`
+        : ""}
+      ${board.length === 0
+        ? html`<p>No Grids were submitted.</p>`
+        : html`<table>
+            <thead><tr><th>Rank</th><th>Participant</th><th>Score</th></tr></thead>
+            <tbody>
+              ${board.map((e) => html`<tr><td>${e.rank}</td><td>${e.displayName}</td><td>${e.score}</td></tr>`)}
+            </tbody>
+          </table>`}`,
+  );
+};
+
+const notLocked = () =>
+  page("Leaderboard not ready", html`<h1>Leaderboard not ready</h1><p>The leaderboard appears once the Organizer has locked the Session and uploaded a Transcript.</p>`);
+
+// Each route resolves only its own token type, so neither link grants the other's capabilities.
+app.get("/i/:token/leaderboard", async (c) => {
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session.locked_at) return c.html(notLocked(), 409);
+  return c.html(await leaderboardPage(c.env.DB, session));
+});
+
+app.get("/o/:token/leaderboard", async (c) => {
+  const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session.locked_at) return c.html(notLocked(), 409);
+  return c.html(await leaderboardPage(c.env.DB, session));
 });
 
 export default app;
