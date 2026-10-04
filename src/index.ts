@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
 import { getLeaderboard } from "./leaderboard";
+import { renderRecapPng } from "./recap";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
   countParticipants,
@@ -75,7 +76,7 @@ const lockedPage = (session: Session) =>
   page(
     "Session locked",
     html`<h1>Session ${session.id} is locked</h1><p>The Organizer has locked this Session, so Grids can no longer be submitted or changed.</p>
-      <p><a href="/i/${session.invite_link_token}/leaderboard">View the leaderboard</a></p>`,
+      <p><a href="/i/${session.invite_link_token}/leaderboard">View the leaderboard</a> | <a href="/i/${session.invite_link_token}/recap.png">Recap Card (PNG)</a></p>`,
   );
 
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
@@ -140,7 +141,7 @@ const organizerView = async (db: D1Database, session: Session, token: string, me
     html`<h1>Organizer: Session ${session.id}</h1>
       <p>Pick Count: ${session.pick_count}</p>
       <p>Participants: ${count}</p>
-      ${session.locked_at ? html`<p><a href="/o/${token}/leaderboard">View the leaderboard</a></p>` : ""}
+      ${session.locked_at ? html`<p><a href="/o/${token}/leaderboard">View the leaderboard</a> | <a href="/o/${token}/recap.png">Recap Card (PNG)</a></p>` : ""}
       ${message?.error ? html`<p role="alert">${message.error}</p>` : ""}
       ${message?.ok ? html`<p role="status">${message.ok}</p>` : ""}
       ${session.locked_at
@@ -202,11 +203,12 @@ app.post("/o/:token/transcript", async (c) => {
   return c.html(await organizerView(c.env.DB, session, token, { ok: "Transcript processed and discarded. Jargon Result updated." }));
 });
 
-const leaderboardPage = async (db: D1Database, session: Session) => {
+const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string) => {
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   return page(
     "Leaderboard",
     html`<h1>Leaderboard: Session ${session.id}</h1>
+      <p><a id="recap-link" href="${recapUrl}">Recap Card (shareable PNG)</a></p>
       ${jargon.length === 0
         ? html`<p>No Jargon Result yet (or no picked term was said), so everyone is at 0 for now.</p>`
         : ""}
@@ -229,14 +231,35 @@ app.get("/i/:token/leaderboard", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
-  return c.html(await leaderboardPage(c.env.DB, session));
+  return c.html(await leaderboardPage(c.env.DB, session, `/i/${session.invite_link_token}/recap.png`));
 });
 
 app.get("/o/:token/leaderboard", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
-  return c.html(await leaderboardPage(c.env.DB, session));
+  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`));
+});
+
+const recap = async (db: D1Database, session: Session) => {
+  const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
+  const png = await renderRecapPng(board, jargon);
+  return new Response(png, { headers: { "content-type": "image/png", "cache-control": "no-store" } });
+};
+
+// Token-scoped (not /sessions/:id) so the image is as unguessable as the leaderboard pages.
+app.get("/i/:token/recap.png", async (c) => {
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session.locked_at) return c.html(notLocked(), 409);
+  return recap(c.env.DB, session);
+});
+
+app.get("/o/:token/recap.png", async (c) => {
+  const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
+  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session.locked_at) return c.html(notLocked(), 409);
+  return recap(c.env.DB, session);
 });
 
 export default app;

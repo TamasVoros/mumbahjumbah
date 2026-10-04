@@ -4,6 +4,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-08-01",
   "workers_dev": true,
+  "alias": { "harfbuzzjs": "./src/harfbuzz-shim.ts", "fs": "./src/empty-shim.ts", "path": "./src/empty-shim.ts" },
+  "rules": [{ "type": "Data", "globs": ["**/*.woff"], "fallthrough": true }],
   "observability": { "enabled": true },
   "d1_databases": [
     {
