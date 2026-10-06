@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:20px;width:1400px;font-family:{{t.ui}};color:{{t.ink}}">
+<div style="display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:24px;padding:24px;background:{{t.surface}};border:1.5px solid {{t.line}};border-radius:{{t.r}}px;align-items:start">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font-family:{{t.mono}};font-size:12px;letter-spacing:.08em;color:{{t.muted}}">{{ tagline }}</div>
+<div style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:30px;line-height:1.1">{{ name }}</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ tags }}" as="tg" hint-placeholder-count="3"><span style="font-family:{{t.mono}};font-size:11px;letter-spacing:.06em;border:1.5px solid {{t.line}};border-radius:99px;padding:4px 10px">{{ tg }}</span></sc-for></div>
+<div style="display:flex;gap:0;margin-top:6px;border:1.5px solid {{t.line}};border-radius:{{t.r}}px;overflow:hidden"><sc-for list="{{ swatches }}" as="s" hint-placeholder-count="5"><div style="flex:1;height:64px;background:{{s.c}};display:flex;align-items:flex-end;padding:6px"><span style="font-family:{{t.mono}};font-size:10px;color:{{s.i}}">{{ s.n }}<br>{{ s.c }}</span></div></sc-for></div>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="font-family:{{t.mono}};font-size:11px;letter-spacing:.08em;color:{{t.muted}}">TYPE · {{ typeName }}</div>
+<div style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:34px;line-height:1.05">Circle back on the roadmap</div>
+<div style="font-family:{{t.ui}};font-size:15px;line-height:1.5">Body — before the call, guess which words the room will say. After, the transcript settles it.</div>
+<div style="display:flex;gap:16px;align-items:baseline"><span style="font-family:{{t.num}};font-size:44px;line-height:1;color:{{t.accent}}">58</span><span style="font-family:{{t.mono}};font-size:11px;letter-spacing:.08em;border:1.5px solid {{t.line}};padding:3px 8px;border-radius:99px">LOCKED</span></div>
+</div>
+<div style="display:flex;gap:16px;align-items:center">
+<div style="width:96px;height:112px;display:flex;align-items:center;justify-content:center;background:{{t.hero}};border-radius:{{t.r}}px">
+<sc-if value="{{ isMask }}" hint-placeholder-val="{{ false }}">
+<svg width="64" height="84" viewBox="0 0 64 84"><path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="{{t.markFill}}"></path><path d="M12 24L32 12L52 24" fill="none" stroke="{{t.markCut}}" stroke-width="3"></path><path d="M13 40L28 36L22 48Z" fill="{{t.markCut}}"></path><path d="M51 40L36 36L42 48Z" fill="{{t.markCut}}"></path><path d="M32 54L38 64L32 76L26 64Z" fill="{{t.markCut}}"></path></svg>
+</sc-if>
+<sc-if value="{{ isAbstract }}" hint-placeholder-val="{{ true }}">
+<svg width="64" height="84" viewBox="0 0 64 84"><path d="M8 22L32 6L56 22" fill="none" stroke="{{t.markFill}}" stroke-width="5"></path><path d="M8 40L32 24L56 40" fill="none" stroke="{{t.markFill}}" stroke-width="5"></path><path d="M32 52L50 68L32 84L14 68Z" fill="{{t.markFill}}"></path></svg>
+</sc-if>
+</div>
+<div style="font-size:13px;line-height:1.5;color:{{t.muted}}">{{ markNote }}</div>
+</div>
+</div>
+<div style="display:flex;gap:24px;align-items:flex-start">
+<div style="width:320px;height:640px;flex:none;border:1.5px solid {{t.line}};border-radius:28px;overflow:hidden;background:{{t.bg}};display:flex;flex-direction:column">
+<div style="background:{{t.hero}};color:{{t.heroInk}};padding:16px 20px 18px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px">
+<sc-if value="{{ isMask }}" hint-placeholder-val="{{ false }}"><svg width="18" height="24" viewBox="0 0 64 84"><path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="{{t.heroInk}}"></path><path d="M13 40L28 36L22 48Z" fill="{{t.hero}}"></path><path d="M51 40L36 36L42 48Z" fill="{{t.hero}}"></path><path d="M32 54L38 64L32 76L26 64Z" fill="{{t.hero}}"></path></svg></sc-if>
+<sc-if value="{{ isAbstract }}" hint-placeholder-val="{{ true }}"><svg width="18" height="24" viewBox="0 0 64 84"><path d="M8 22L32 6L56 22" fill="none" stroke="{{t.heroInk}}" stroke-width="7"></path><path d="M8 40L32 24L56 40" fill="none" stroke="{{t.heroInk}}" stroke-width="7"></path><path d="M32 52L50 68L32 84L14 68Z" fill="{{t.heroInk}}"></path></svg></sc-if>
+<span style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:17px">MumbahJumbah</span></div><span style="font-size:13px;text-decoration:underline">Sign in</span></div>
+<div style="font-family:{{t.mono}};font-size:11px;letter-spacing:.08em;color:{{t.heroAccent}};margin-top:2px">REVERSE BINGO FOR MEETINGS</div>
+<div style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:32px;line-height:1.05;letter-spacing:-.01em">Predict the jargon. Win the meeting.</div>
+<div style="font-size:15px;line-height:1.45">Guess the buzzwords before the call. Get scored against the transcript after.</div>
+<div style="background:{{t.cta}};color:{{t.ctaInk}};border-radius:{{t.r}}px;padding:14px;text-align:center;font-weight:700;font-size:16px">Create a session</div>
+
+</div>
+<svg width="100%" height="16" style="display:block;flex:none"><defs><pattern id="b{{variant}}" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M0 12L8 4L16 12" fill="none" stroke="{{t.band}}" stroke-width="2.5"></path></pattern></defs><rect width="100%" height="16" fill="url(#b{{variant}})"></rect></svg>
+<div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;flex:1">
+<sc-for list="{{ steps }}" as="st" hint-placeholder-count="3"><div style="display:flex;gap:12px;align-items:flex-start"><span style="font-family:{{t.num}};font-size:24px;line-height:1;color:{{t.accent}};width:22px">{{ st.n }}</span><div><div style="font-weight:700;font-size:15px">{{ st.h }}</div><div style="font-size:13px;line-height:1.4;color:{{t.muted}}">{{ st.p }}</div></div></div></sc-for>
+<div style="margin-top:auto;font-family:{{t.mono}};font-size:10.5px;letter-spacing:.04em;border:1.5px solid {{t.line}};border-radius:{{t.r}}px;padding:8px 10px;background:{{t.surface}}">TRANSCRIPTS ARE READ IN MEMORY, THEN DELETED.</div>
+</div>
+</div>
+<div style="width:320px;height:640px;flex:none;border:1.5px solid {{t.line}};border-radius:28px;overflow:hidden;background:{{t.bg}};display:flex;flex-direction:column">
+<div style="padding:18px 20px 0;display:flex;flex-direction:column;gap:4px"><div style="font-family:{{t.mono}};font-size:11px;letter-spacing:.08em;color:{{t.muted}}">STEP 1 OF 1</div><div style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:28px;line-height:1.1">New session</div></div>
+<svg width="100%" height="16" style="display:block;flex:none;margin-top:12px"><rect width="100%" height="16" fill="url(#b{{variant}})"></rect></svg>
+<div style="padding:16px 20px;display:flex;flex-direction:column;gap:16px;flex:1">
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:13px;font-weight:700">Session name</div><div style="background:{{t.surface}};border:1.5px solid {{t.line}};border-radius:{{t.r}}px;padding:12px;font-size:15px">Q3 All-Hands</div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:13px;font-weight:700">Pick count</div>
+<div style="display:flex;gap:8px"><div style="flex:1;text-align:center;padding:11px 0;border-radius:{{t.r}}px;background:{{t.accent}};color:{{t.accentInk}};font-weight:700;border:1.5px solid {{t.accent}}">9</div><div style="flex:1;text-align:center;padding:11px 0;border-radius:{{t.r}}px;background:{{t.surface}};border:1.5px solid {{t.line}};font-weight:700">25</div><div style="flex:1;text-align:center;padding:11px 0;border-radius:{{t.r}}px;background:{{t.surface}};border:1.5px solid {{t.line}};color:{{t.muted}}">Custom</div></div>
+<div style="font-size:12px;color:{{t.muted}}">Each player submits exactly this many words or phrases.</div></div>
+<div style="background:{{t.cta}};color:{{t.ctaInk}};border-radius:{{t.r}}px;padding:14px;text-align:center;font-weight:700;font-size:16px">Create session</div>
+<div style="height:1.5px;background:{{t.line}};opacity:.25"></div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font-family:{{t.mono}};font-size:11px;letter-spacing:.08em;color:{{t.muted}}">YOUR LINKS</div>
+<div style="background:{{t.surface}};border:1.5px solid {{t.line}};border-radius:{{t.r}}px;padding:10px 12px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:14px">Invite link</span><span style="font-size:12px;color:{{t.accent}};font-weight:700">Copy</span></div><div style="font-family:{{t.mono}};font-size:12px;color:{{t.muted}}">mumbahjumbah.com/i/k3x9q</div><div style="font-size:12px">Share with the team.</div></div>
+<div style="background:{{t.surface}};border:1.5px dashed {{t.line}};border-radius:{{t.r}}px;padding:10px 12px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;font-size:14px">Organizer link</span><span style="font-family:{{t.mono}};font-size:10px;letter-spacing:.06em;background:{{t.tag}};color:{{t.tagInk}};padding:2px 8px;border-radius:99px">PRIVATE</span></div><div style="font-family:{{t.mono}};font-size:12px;color:{{t.muted}}">mumbahjumbah.com/o/7fa1…</div><div style="font-size:12px">Only you lock and score. Don’t post it.</div></div>
+</div></div></div>
+<div style="width:320px;height:640px;flex:none;border:1.5px solid {{t.line}};border-radius:28px;overflow:hidden;background:{{t.bg}};display:flex;flex-direction:column">
+<div style="padding:18px 20px 12px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:22px">Q3 All-Hands</div><span style="font-family:{{t.mono}};font-size:10px;letter-spacing:.06em;background:{{t.tag}};color:{{t.tagInk}};padding:3px 9px;border-radius:99px">OPEN</span></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;font-size:13px"><span style="font-weight:700">4 of 9 picked</span><span style="color:{{t.muted}}">Locks when host starts</span></div><div style="height:8px;border:1.5px solid {{t.line}};border-radius:99px;background:{{t.surface}};overflow:hidden"><div style="width:44%;height:100%;background:{{t.accent}}"></div></div></div></div>
+<svg width="100%" height="16" style="display:block;flex:none"><rect width="100%" height="16" fill="url(#b{{variant}})"></rect></svg>
+<div style="padding:12px 20px;display:flex;flex-direction:column;gap:8px;flex:1;overflow:hidden">
+<sc-for list="{{ picks }}" as="p" hint-placeholder-count="9"><div style="display:flex;align-items:center;gap:10px;background:{{t.surface}};border:1.5px solid {{t.line}};border-radius:{{t.r}}px;padding:0 12px;height:44px"><span style="font-family:{{t.mono}};font-size:12px;color:{{t.muted}};width:18px">{{ p.n }}</span><span style="font-size:15px;color:{{p.c}}">{{ p.t }}</span></div></sc-for>
+</div>
+<div style="padding:12px 20px 20px;background:{{t.bg}};border-top:1.5px solid {{t.line}}"><div style="background:{{t.accent}};color:{{t.accentInk}};opacity:.45;border-radius:{{t.r}}px;padding:14px;text-align:center;font-weight:700;font-size:16px">Submit grid · 5 to go</div><div style="font-size:12px;color:{{t.muted}};text-align:center;margin-top:8px">Resubmit with the same email to change picks until lock.</div></div>
+</div>
+<div style="width:320px;height:640px;flex:none;border:1.5px solid {{t.line}};border-radius:28px;overflow:hidden;background:{{t.lbBg}};color:{{t.lbInk}};display:flex;flex-direction:column">
+<div style="padding:18px 20px 12px;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:{{t.disp}};font-weight:{{t.dispW}};font-size:22px">Q3 All-Hands</div><span style="font-family:{{t.mono}};font-size:10px;letter-spacing:.06em;border:1.5px solid {{t.lbInk}};padding:2px 8px;border-radius:99px">LOCKED</span></div><div style="font-size:13px;opacity:.8">Leaderboard · 12 players · 9 picks each</div></div>
+<svg width="100%" height="16" style="display:block;flex:none"><defs><pattern id="l{{variant}}" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M0 12L8 4L16 12" fill="none" stroke="{{t.lbBand}}" stroke-width="2.5"></path></pattern></defs><rect width="100%" height="16" fill="url(#l{{variant}})"></rect></svg>
+<div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;padding:18px 16px 12px">
+<sc-for list="{{ podium }}" as="pd" hint-placeholder-count="3"><div style="background:{{pd.bg}};color:{{pd.ink}};border:1.5px solid {{pd.bd}};border-radius:{{t.r}}px;padding:10px 6px {{pd.pb}}px;text-align:center;display:flex;flex-direction:column;gap:2px"><span style="display:block;font-family:{{t.mono}};font-size:11px;line-height:16px">#{{ pd.rank }}</span><span style="display:block;font-family:{{t.num}};font-size:{{pd.fs}}px;line-height:1.2;color:{{pd.num}}">{{ pd.score }}</span><span style="display:block;font-size:13px;line-height:18px;font-weight:700">{{ pd.name }}</span></div></sc-for>
+</div>
+<div style="padding:0 16px;display:flex;flex-direction:column;gap:6px;flex:1;overflow:hidden">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:10px;background:{{t.lbCard}};border:1.5px solid {{t.lbLine}};border-radius:{{t.r}}px;padding:0 12px;height:40px"><span style="font-family:{{t.mono}};font-size:12px;width:20px;opacity:.7">{{ r.rank }}</span><span style="flex:1;font-size:14px;font-weight:600">{{ r.name }}</span><span style="font-family:{{t.num}};font-size:18px">{{ r.score }}</span></div></sc-for>
+</div>
+<div style="padding:12px 16px 18px"><div style="background:{{t.lbCta}};color:{{t.lbCtaInk}};border-radius:{{t.r}}px;padding:13px;text-align:center;font-weight:700;font-size:15px">Get the recap card</div></div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:960},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;a&quot;,&quot;b&quot;,&quot;c&quot;],&quot;default&quot;:&quot;a&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const v = this.props.variant || 'a';
+    const bone='#F4EFE6', ink='#17140F', red='#C4412B', ind='#24386B', raf='#D8C79E';
+    const T = {
+      a: { name:'Bone & Ink', tagline:'1A · BALANCED · FULLY ABSTRACT', tags:['Neutral grounds','One accent per screen','Chevron bands'], typeName:'SPACE GROTESK + SPACE MONO', markNote:'Mark: stacked chevrons over a diamond. Pure pattern vocabulary, no face — reads as a logo, safe in any boardroom.', abstract:true,
+        sw:[[bone,'bone',ink],['#FFFFFF','paper',ink],[ink,'ink',bone],[red,'clay',bone],[ind,'indigo',bone],[raf,'raffia',ink]],
+        t:{bg:bone,surface:'#FFFFFF',ink,muted:'#6B6154',line:ink,accent:red,accentInk:'#fff',hero:bone,heroInk:ink,heroAccent:red,cta:red,ctaInk:'#fff',band:ink,r:4,ui:"'Space Grotesk',sans-serif",disp:"'Space Grotesk',sans-serif",dispW:700,num:"'Space Grotesk',sans-serif",mono:"'Space Mono',monospace",markFill:ink,markCut:bone,tag:raf,tagInk:ink,lbBg:bone,lbInk:ink,lbCard:'#fff',lbLine:ink,lbBand:red,lbCta:ink,lbCtaInk:bone},
+        pod:{top:['#fff',ink,red,red],oth:['#fff',ink,ink,ink]} },
+      b: { name:'Indigo Raffia', tagline:'1B · BOLD · STYLIZED MASK', tags:['Indigo + raffia grounds','Colour on every screen','Mask mark'], typeName:'ARCHIVO + ANTON + JETBRAINS MONO', markNote:'Mark: tall mask built from triangles, a chevron crown and a diamond mouth. More ownable, still flat geometry — no ornament copied from real masks.', abstract:false,
+        sw:[['#1F2F63','indigo',bone],[bone,'bone',ink],['#D2432C','red',bone],['#E3C26E','raffia','#17140F'],['#121A3D','night',bone],['#17140F','ink',bone]],
+        t:{bg:bone,surface:'#FFFFFF',ink:'#17140F',muted:'#5F5648',line:'#17140F',accent:'#1F2F63',accentInk:'#fff',hero:'#1F2F63',heroInk:bone,heroAccent:'#E3C26E',cta:'#D2432C',ctaInk:'#fff',band:'#D2432C',r:2,ui:"'Archivo',sans-serif",disp:"'Archivo',sans-serif",dispW:800,num:"'Anton',sans-serif",mono:"'JetBrains Mono',monospace",markFill:bone,markCut:'#1F2F63',tag:'#E3C26E',tagInk:'#17140F',lbBg:'#1F2F63',lbInk:bone,lbCard:'#172352',lbLine:'#3C4E8A',lbBand:'#E3C26E',lbCta:'#D2432C',lbCtaInk:'#fff'},
+        pod:{top:['#E3C26E','#17140F','#E3C26E','#17140F'],oth:['#172352',bone,'#3C4E8A','#E3C26E']} },
+      c: { name:'Raffia Slab', tagline:'1C · BALANCED · STYLIZED MASK', tags:['Warm raffia ground','Indigo as the working colour','Slab headlines'], typeName:'ZILLA SLAB + INSTRUMENT SANS + DM MONO', markNote:'Same mask construction as 1B, softer radii and a warmer palette — friendlier for teams, still credible for coaches.', abstract:false,
+        sw:[['#ECE2CB','raffia',ink],['#FBF7EE','paper',ink],['#1D1A14','ink',bone],['#2B3F7A','indigo',bone],['#C4412B','clay',bone],['#C9A24A','ochre',ink]],
+        t:{bg:'#ECE2CB',surface:'#FBF7EE',ink:'#1D1A14',muted:'#645A47',line:'#1D1A14',accent:'#2B3F7A',accentInk:'#fff',hero:'#D9C79E',heroInk:'#1D1A14',heroAccent:'#2B3F7A',cta:'#2B3F7A',ctaInk:'#fff',band:'#C4412B',r:10,ui:"'Instrument Sans',sans-serif",disp:"'Zilla Slab',serif",dispW:700,num:"'Zilla Slab',serif",mono:"'DM Mono',monospace",markFill:'#1D1A14',markCut:'#D9C79E',tag:'#C9A24A',tagInk:'#1D1A14',lbBg:'#ECE2CB',lbInk:'#1D1A14',lbCard:'#FBF7EE',lbLine:'#1D1A14',lbBand:'#2B3F7A',lbCta:'#1D1A14',lbCtaInk:'#ECE2CB'},
+        pod:{top:['#2B3F7A','#fff','#2B3F7A','#C9A24A'],oth:['#FBF7EE','#1D1A14','#1D1A14','#C4412B']} }
+    }[v];
+    const mk = (rank,score,name,top,fs,pb) => { const p = top?T.pod.top:T.pod.oth; return {rank,score,name,bg:p[0],ink:p[1],bd:p[2],num:p[3],fs,pb}; };
+    const picks = [['synergy',1],['circle back',1],['move the needle',1],['bandwidth',1]].map((x,i)=>({n:i+1,t:x[0],c:'inherit'}))
+      .concat([5,6,7,8,9].map(n=>({n,t:n===5?'Type a word or phrase…':'',c:'#8a8070'})));
+    return {
+      t:T.t, variant:v, name:T.name, tagline:T.tagline, tags:T.tags, typeName:T.typeName, markNote:T.markNote,
+      isAbstract:T.abstract, isMask:!T.abstract,
+      swatches:T.sw.map(s=>({c:s[0],n:s[1],i:s[2]})),
+      steps:[{n:1,h:'Pick your words',p:'Before the call, guess what will be said. Nine picks, one per line.'},{n:2,h:'Lock and meet',p:'The organizer locks the grid. Then the meeting happens, as meetings do.'},{n:3,h:'Upload and score',p:'Only words someone picked are counted. Everything else is never kept.'}],
+      picks,
+      podium:[mk(2,41,'Priya',false,36,14),mk(1,58,'Marcus',true,52,26),mk(3,33,'Jo',false,32,10)],
+      rows:[[4,'Dana',29],[5,'Wei',24],[6,'Tomás',22],[7,'Aisha',18],[8,'Sam',15],[9,'Lena',11],[10,'Ollie',0]].map(r=>({rank:r[0],name:r[1],score:r[2]}))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # mumbahjumbah
 
-Reverse Bingo v1 on Cloudflare Workers + Hono + D1. See `docs/designs/reverse-bingo.md` and `docs/adr/`.
+Reverse Bingo v1 on Cloudflare Workers + Hono + D1. See `CONTEXT.md` and `docs/adr/`.
 
 ## Run locally / open it
 
