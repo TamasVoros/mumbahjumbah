@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { html, raw } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
+import { entryView, lockedView, submittedView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
@@ -291,42 +292,19 @@ app.post("/sessions", async (c) => {
   );
 });
 
-const lockedPage = (session: Session) =>
-  page(
-    "Session locked",
-    html`<h1>Session ${session.id} is locked</h1><p>The Organizer has locked this Session, so Grids can no longer be submitted or changed.</p>
-      <p><a href="/i/${session.invite_link_token}/leaderboard">View the leaderboard</a> | <a href="/i/${session.invite_link_token}/recap.png">Recap Card (PNG)</a></p>`,
-  );
-
-type FormValues = { email?: string; display_name?: string; picks?: string[] };
-
-const gridForm = (pickCount: number, v: FormValues = {}, error?: string) =>
-  html`<h1>Submit your Grid</h1>
-    <p>Predict ${pickCount} words or phrases you expect to hear. Each must be different.</p>
-    ${error ? html`<p role="alert">${error}</p>` : ""}
-    <form method="post">
-      <label>Email <input type="email" name="email" value="${v.email ?? ""}" required /></label>
-      <label>Display Name <input type="text" name="display_name" value="${v.display_name ?? ""}" required /></label>
-      <ol>
-        ${Array.from(
-          { length: pickCount },
-          (_, i) => html`<li><input type="text" name="pick" value="${v.picks?.[i] ?? ""}" required /></li>`,
-        )}
-      </ol>
-      <button type="submit">Submit Grid</button>
-    </form>`;
+const notFound = () => page("Not found", html`<h1>Session not found</h1>`);
 
 app.get("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
-  if (session.locked_at) return c.html(lockedPage(session), 403);
-  return c.html(page(`Session ${session.id}`, html`<p>Session ${session.id}</p>${gridForm(session.pick_count)}`));
+  if (!session) return c.html(notFound(), 404);
+  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
+  return c.html(entryView(session.id, session.pick_count));
 });
 
 app.post("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
-  if (session.locked_at) return c.html(lockedPage(session), 403);
+  if (!session) return c.html(notFound(), 404);
+  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
   const raw = await c.req.parseBody({ all: true });
   const result = validateGrid(raw, session.pick_count);
   if (!result.ok) {
@@ -336,20 +314,10 @@ app.post("/i/:token", async (c) => {
       display_name: typeof raw["display_name"] === "string" ? raw["display_name"] : "",
       picks,
     };
-    return c.html(
-      page(`Session ${session.id}`, html`<p>Session ${session.id}</p>${gridForm(session.pick_count, values, result.error)}`),
-      400,
-    );
+    return c.html(entryView(session.id, session.pick_count, values, result.error), 400);
   }
   await saveGrid(c.env.DB, session.id, result.value);
-  return c.html(
-    page(
-      "Grid submitted",
-      html`<h1>Grid submitted</h1>
-        <p>Thanks, ${result.value.displayName}. Your ${session.pick_count} picks are saved. Resubmit with the same email to change them.</p>
-        <p><a href="">Edit your Grid</a></p>`,
-    ),
-  );
+  return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks));
 });
 
 const organizerView = async (db: D1Database, session: Session, token: string, message?: { error?: string; ok?: string }) => {
