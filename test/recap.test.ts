@@ -78,6 +78,12 @@ describe("recapLayout", () => {
     expect(t).toContain("MUMBAHJUMBAH.COM");
   });
 
+  it("keeps a non-collapsible space between the label and the bold word", () => {
+    const raw = (n: unknown): string =>
+      typeof n === "string" ? n : Array.isArray(n) ? n.map(raw).join("") : n && typeof n === "object" ? raw((n as { props: { children?: unknown } }).props.children) : "";
+    expect(raw(recapLayout(board, [{ term: "synergy", occurrences: 7 }]))).toContain("Most-said word: “synergy”");
+  });
+
   it("says so when nothing matched, and handles an empty board", () => {
     expect(text(recapLayout([], []))).toContain("No picks matched");
     expect(text(recapLayout([], []))).toContain("No Grids, no winner.");

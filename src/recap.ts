@@ -76,9 +76,9 @@ export function recapLayout(board: LeaderboardEntry[], jargon: Counted[]): Node 
   const headline = winner ? `${truncate(winner.displayName, 16)} called it.` : "No Grids, no winner.";
   const stat = top
     ? [
-        winner ? `${winner.score} points. ` : "",
-        "Most-said word: ",
-        el("b", { fontWeight: 800 }, `“${truncate(top.term, 24)}”`),
+        `${winner ? `${winner.score} points. ` : ""}Most-said word:`,
+        // NBSP: satori trims a plain trailing space before an inline element.
+        el("b", { fontWeight: 800 }, ` “${truncate(top.term, 24)}”`),
         `, ${top.occurrences} ${top.occurrences === 1 ? "time" : "times"}.`,
       ]
     : [winner ? `${winner.score} points. ` : "", "No picks matched the transcript."];
