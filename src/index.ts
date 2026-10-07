@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
 import { getLeaderboard } from "./leaderboard";
 import { renderRecapPng } from "./recap";
@@ -72,11 +72,69 @@ app.post("/sessions", async (c) => {
   );
 });
 
+const errorCss = `
+*{box-sizing:border-box}
+body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;display:flex;justify-content:center;padding:32px 24px}
+.error-card{width:100%;max-width:420px;border:1.5px solid #17140F;border-radius:2px;overflow:hidden;background:#F4EFE6;display:flex;flex-direction:column}
+.error-card header{background:#1F2F63;color:#F4EFE6;padding:24px;display:flex;flex-direction:column;gap:6px}
+.error-code{font-family:'Anton',sans-serif;font-size:56px;line-height:1;color:#E3C26E}
+.error-card h1{margin:0;font-weight:800;font-size:20px;line-height:1.15;overflow-wrap:anywhere}
+.error-body{padding:20px 24px 24px;display:flex;flex-direction:column;gap:16px}
+.error-body p{margin:0;font-size:14px;line-height:1.5;color:#5F5648}
+.error-actions{display:flex;flex-direction:column;gap:8px}
+.error-action{display:block;min-height:44px;border:1.5px solid #17140F;border-radius:2px;padding:12px;text-align:center;font-weight:700;font-size:14px;background:#fff;color:#17140F;text-decoration:none}
+.error-action:hover{color:#8F2B22}
+`;
+
+const errorPage = (
+  title: string,
+  code: string,
+  headline: string,
+  message: string,
+  actions: { href: string; label: string }[],
+) => html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;700;800&display=swap" rel="stylesheet" />
+    <style>${raw(errorCss)}</style>
+  </head>
+  <body>
+    <main class="error-card">
+      <header><span class="error-code">${code}</span><h1>${headline}</h1></header>
+      <div class="error-body">
+        <p>${message}</p>
+        <div class="error-actions">
+          ${actions.map((a) => html`<a class="error-action" href="${a.href}">${a.label}</a>`)}
+        </div>
+      </div>
+    </main>
+  </body>
+</html>`;
+
+const notFoundPage = () =>
+  errorPage(
+    "Not found",
+    "404",
+    "That link doesn’t go anywhere.",
+    "Either it was mistyped or the session was cleared. Ask your organizer for a fresh one.",
+    [{ href: "/", label: "Back to start" }],
+  );
+
 const lockedPage = (session: Session) =>
-  page(
+  errorPage(
     "Session locked",
-    html`<h1>Session ${session.id} is locked</h1><p>The Organizer has locked this Session, so Grids can no longer be submitted or changed.</p>
-      <p><a href="/i/${session.invite_link_token}/leaderboard">View the leaderboard</a> | <a href="/i/${session.invite_link_token}/recap.png">Recap Card (PNG)</a></p>`,
+    "403",
+    `Session ${session.id} is locked`,
+    "The Organizer has locked this Session, so Grids can no longer be submitted or changed.",
+    [
+      { href: `/i/${session.invite_link_token}/leaderboard`, label: "View the leaderboard" },
+      { href: `/i/${session.invite_link_token}/recap.png`, label: "Recap Card (PNG)" },
+    ],
   );
 
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
@@ -99,14 +157,14 @@ const gridForm = (pickCount: number, v: FormValues = {}, error?: string) =>
 
 app.get("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (session.locked_at) return c.html(lockedPage(session), 403);
   return c.html(page(`Session ${session.id}`, html`<p>Session ${session.id}</p>${gridForm(session.pick_count)}`));
 });
 
 app.post("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (session.locked_at) return c.html(lockedPage(session), 403);
   const raw = await c.req.parseBody({ all: true });
   const result = validateGrid(raw, session.pick_count);
@@ -169,7 +227,7 @@ const organizerView = async (db: D1Database, session: Session, token: string, me
 app.get("/o/:token", async (c) => {
   const token = c.req.param("token");
   const session = await findByOrganizerToken(c.env.DB, token);
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   return c.html(await organizerView(c.env.DB, session, token));
 });
 
@@ -177,7 +235,7 @@ app.get("/o/:token", async (c) => {
 app.post("/o/:token/lock", async (c) => {
   const token = c.req.param("token");
   const session = await lockSession(c.env.DB, token);
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   return c.html(await organizerView(c.env.DB, session, token));
 });
 
@@ -185,7 +243,7 @@ app.post("/o/:token/lock", async (c) => {
 app.post("/o/:token/transcript", async (c) => {
   const token = c.req.param("token");
   const session = await findByOrganizerToken(c.env.DB, token);
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) {
     return c.html(
       await organizerView(c.env.DB, session, token, { error: "Lock the Session before uploading a Transcript." }),
@@ -229,14 +287,14 @@ const notLocked = () =>
 // Each route resolves only its own token type, so neither link grants the other's capabilities.
 app.get("/i/:token/leaderboard", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return c.html(await leaderboardPage(c.env.DB, session, `/i/${session.invite_link_token}/recap.png`));
 });
 
 app.get("/o/:token/leaderboard", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`));
 });
@@ -250,14 +308,14 @@ const recap = async (db: D1Database, session: Session) => {
 // Token-scoped (not /sessions/:id) so the image is as unguessable as the leaderboard pages.
 app.get("/i/:token/recap.png", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return recap(c.env.DB, session);
 });
 
 app.get("/o/:token/recap.png", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return recap(c.env.DB, session);
 });
