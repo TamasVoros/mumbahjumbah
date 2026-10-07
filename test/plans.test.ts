@@ -26,6 +26,17 @@ describe("GET /plans", () => {
     expect(body).toContain("min-width:900px");
   });
 
+  it("marks Coach and Organization buttons aria-disabled (no payment flow)", async () => {
+    const body = await (await get("/plans")).text();
+    expect(body.match(/<button type="button" class="cta" aria-disabled="true"/g)).toHaveLength(2);
+  });
+
+  it("has no fixed widths that could force horizontal scroll", async () => {
+    const body = await (await get("/plans")).text();
+    expect(body).toContain("box-sizing:border-box");
+    expect(body).not.toMatch(/[^-]width:\d{3,}px/);
+  });
+
   it("is linked from the landing page", async () => {
     const body = await (await get("/")).text();
     expect(body).toContain('<a href="/plans">See plans</a>');

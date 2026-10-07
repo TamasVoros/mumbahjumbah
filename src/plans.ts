@@ -100,7 +100,7 @@ export const plansPage = () => html`<!doctype html>
             <ul>${p.feats.map((f) => html`<li>${f}</li>`)}</ul>
             ${p.href
               ? html`<a class="cta" href="${p.href}">${p.btn}</a>`
-              : html`<button type="button" class="cta">${p.btn}</button>`}
+              : html`<button type="button" class="cta" aria-disabled="true" title="Coming soon">${p.btn}</button>`}
           </section>`,
         )}
       </div>
