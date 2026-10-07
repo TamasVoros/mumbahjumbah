@@ -46,8 +46,40 @@ describe("Transcript upload", () => {
     expect(await result(s.id)).toEqual({ ai: 2, synergy: 1, "move the needle": 1 });
     const page = await res.text();
     expect(page).toContain("Jargon Result");
-    expect(page).toContain("<td>ai</td><td>2</td>");
+    expect(page).toContain('<span class="t">ai</span><span class="by">2 picked</span><span class="n">×2</span>');
+    expect(page).toContain("width:100%");
     expect(page).not.toContain("unpicked");
+  });
+
+  it("accepts pasted transcript text, preferring a chosen file", async () => {
+    const s = await lockedSession([["alpha", "beta"]]);
+    const paste = (text: string, file?: string) => {
+      const form = new FormData();
+      form.set("transcript_text", text);
+      if (file !== undefined) form.set("transcript", new File([file], "f.txt"));
+      return SELF.fetch(`https://example.com/o/${s.organizer_link_token}/transcript`, { method: "POST", body: form });
+    };
+    expect((await paste("alpha alpha beta")).status).toBe(200);
+    expect(await result(s.id)).toEqual({ alpha: 2, beta: 1 });
+    expect((await paste("alpha", "beta")).status).toBe(200);
+    expect(await result(s.id)).toEqual({ beta: 1 });
+    expect((await paste("   ")).status).toBe(400);
+    expect(await result(s.id)).toEqual({ beta: 1 });
+  });
+
+  it("renders the upload panel and unseen picks per the design", async () => {
+    const s = await lockedSession([["alpha", "beta"]]);
+    const before = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
+    expect(before).toContain("Drop a transcript here");
+    expect(before).toContain(".TXT · .VTT");
+    expect(before).not.toContain(".SRT");
+    expect(before).toContain("Score the session");
+    expect(before).toContain("Transcripts are read in memory, then deleted.");
+    expect(before).toContain("No Jargon Result yet");
+    const page = await (await upload(s.organizer_link_token, "t.txt", "alpha alpha alpha beta")).text();
+    expect(page).toContain("2 of your 2 picks showed up.");
+    expect(page).toContain("width:33%");
+    expect((await (await upload(s.organizer_link_token, "t.txt", "alpha")).text())).toContain("word--zero");
   });
 
   it("strips VTT structure before matching", async () => {
