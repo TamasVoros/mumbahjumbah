@@ -26,7 +26,7 @@ param(
     [string]$Base = "",
     [int]$MaxRounds = 2,
     [string]$Extra = "",
-    [string[]]$Tools = @("Read", "Glob", "Grep", "Bash(git:*)", "Bash(gh:*)", "Bash(npm:*)", "Bash(npx:*)", "Bash(node:*)")
+    [string[]]$Tools = @("Read", "Glob", "Grep", "Bash(git:*)", "Bash(gh:*)", "Bash(npm:*)", "Bash(npx:*)", "Bash(node:*)", "Bash(curl:*)", "PowerShell(Invoke-WebRequest:*)", "PowerShell(Invoke-RestMethod:*)")
 )
 $ErrorActionPreference = "Continue"   # Stop would turn native stderr (2>$null) into terminating errors in PS 5.1; failures are checked explicitly
 
@@ -61,9 +61,11 @@ try {
         Add-Content -Path $exclude -Value ".afk/"
     }
 
-    $issueText = gh issue view $Issue --json number,title,body --jq '"#\(.number) \(.title)\n\n\(.body)"' 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $issueText) { Fail "env-error" "issue #$Issue not found (or gh not authenticated)" }
-    $issueText = ($issueText -join "`n")
+    # No --jq here: Windows PowerShell 5.1 strips embedded double quotes from native-command args.
+    $issueJson = (gh issue view $Issue --json number,title,body 2>$null) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or -not $issueJson) { Fail "env-error" "issue #$Issue not found (or gh not authenticated)" }
+    $iss = $issueJson | ConvertFrom-Json
+    $issueText = "#$($iss.number) $($iss.title)`n`n$($iss.body)"
 
     if (-not $Base) { $Base = (git rev-parse --abbrev-ref HEAD).Trim() }
     $baseSha = (git rev-parse $Base).Trim()
