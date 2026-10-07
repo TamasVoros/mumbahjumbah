@@ -43,12 +43,12 @@ const createForm = (error?: string) =>
     "Create a Session",
     html`<h1>Create a Session</h1>
       <style>
-        .pills { border: 0; padding: 0; display: flex; gap: 8px; }
+        .pills { --indigo: #1F2F63; border: 0; padding: 0; display: flex; gap: 8px; }
         .pills label { cursor: pointer; position: relative; }
         .pills input { position: absolute; opacity: 0; }
-        .pills span { display: inline-block; min-height: 44px; line-height: 44px; padding: 0 18px; border: 1.5px solid #1F2F63; border-radius: 99px; }
-        .pills input:checked + span { background: #1F2F63; color: #fff; }
-        .pills input:focus-visible + span { outline: 2px solid #1F2F63; outline-offset: 2px; }
+        .pills span { display: inline-block; min-height: 44px; line-height: 44px; padding: 0 18px; border: 1.5px solid var(--indigo); border-radius: 99px; }
+        .pills input:checked + span { background: var(--indigo); color: #fff; }
+        .pills input:focus-visible + span { outline: 2px solid var(--indigo); outline-offset: 2px; }
         #custom-pick { display: none; }
         form:has(#pick-custom:checked) #custom-pick { display: block; }
       </style>
@@ -65,7 +65,22 @@ const createForm = (error?: string) =>
           <input type="number" name="pick_count" min="1" step="1" value="9" />
         </label>
         <button type="submit">Create Session</button>
-      </form>`,
+      </form>
+      <script>
+        // Only the Custom number input takes part in validation and submission; for 5/10 it is disabled,
+        // so a stale invalid value in the hidden field can never block a preset submit.
+        (function () {
+          var form = document.querySelector('form[action="/sessions"]');
+          var input = form.querySelector('input[name="pick_count"]');
+          function sync() {
+            var custom = form.querySelector("#pick-custom").checked;
+            input.disabled = !custom;
+            input.required = custom;
+          }
+          form.addEventListener("change", sync);
+          sync();
+        })();
+      </script>`,
   );
 
 app.get("/", (c) => c.html(createForm()));

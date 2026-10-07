@@ -35,6 +35,35 @@ describe("Create Session", () => {
     expect(pills.slice(1).some((p) => p.includes("checked"))).toBe(false);
   });
 
+  it("inline script disables the number input unless Custom is selected, and requires it for Custom", async () => {
+    const body = await (await SELF.fetch("https://example.com/")).text();
+    const script = /<script>([\s\S]*?)<\/script>/.exec(body)![1]!;
+    const input = { disabled: false, required: false };
+    const custom = { checked: true };
+    let onChange = () => {};
+    const form = {
+      querySelector: (sel: string) => (sel.includes("pick_count") ? input : custom),
+      addEventListener: (_: string, fn: () => void) => (onChange = fn),
+    };
+    new Function("document", script)({ querySelector: () => form });
+    // Custom selected on load: input live and required.
+    expect(input).toEqual({ disabled: false, required: true });
+    // Switching to 5/10: input disabled, so it cannot block submission or be sent.
+    custom.checked = false;
+    onChange();
+    expect(input).toEqual({ disabled: true, required: false });
+    // Back to Custom.
+    custom.checked = true;
+    onChange();
+    expect(input).toEqual({ disabled: false, required: true });
+  });
+
+  it("hides the number input via CSS unless Custom is checked", async () => {
+    const body = await (await SELF.fetch("https://example.com/")).text();
+    expect(body).toContain("#custom-pick { display: none; }");
+    expect(body).toContain("form:has(#pick-custom:checked) #custom-pick { display: block; }");
+  });
+
   it("submits a preset pill's count directly, ignoring the number input", async () => {
     for (const n of [5, 10]) {
       const res = await createPreset(String(n), "abc");
