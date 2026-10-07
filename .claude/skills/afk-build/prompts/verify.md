@@ -14,5 +14,5 @@ Evidence levels (this session is headless: assume there is NO browser, so do not
 - FAIL: the behaviour is wrong, missing, or contradicts the issue or DESIGN.md, or the tests/typecheck fail.
 - UNVERIFIED: only for a non-visual criterion you genuinely could not exercise by any means above. This DOES fail the run.
 
-Output a report with one line per acceptance criterion (PASS / HUMAN-CHECK / FAIL / UNVERIFIED + evidence), then a list of defects the implementer must fix, then a short "For a human to eyeball" list (may be empty).
+Output a report with one line per acceptance criterion (PASS / HUMAN-CHECK / FAIL / UNVERIFIED + evidence), then a list of defects the implementer must fix, then a section headed exactly `## Human check` with a markdown checklist (`- [ ] ...`) of everything a human should eyeball, including every HUMAN-CHECK criterion (write `_none_` if empty). The script posts that section to the issue.
 The very last line must be exactly `VERDICT: PASS` or `VERDICT: FAIL`. PASS only if no criterion is FAIL or UNVERIFIED, at least the non-visual criteria are PASS, and the test suite is green.

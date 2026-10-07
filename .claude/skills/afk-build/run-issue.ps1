@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Deliver one GitHub issue: implementer session -> independent verifier session (-> fix rounds).
 .DESCRIPTION
@@ -153,6 +153,8 @@ if ($repo -and $reason -notmatch '^issue #\d+ not found') {
     try {
         if ($status -eq "PASS") {
             $body = "AFK run ``$runId`` on branch ``$branch`` (model ``$Model``): independent verification **passed** in round $rounds. HEAD ``$headSha``."
+            $hc = if ($lastReport -match '(?ms)^#{1,4}\s*Human check\s*$(.*?)(?=^VERDICT:|^#{1,4}\s|\z)') { $Matches[1].Trim() } else { "" }
+            if ($hc) { $body += "`n`n**Human check (needs a person to eyeball)**`n$hc" }
             gh issue comment $Issue --body $body 2>$null | Out-Null
             gh issue edit $Issue --remove-label afk-failed 2>$null | Out-Null
         } else {
