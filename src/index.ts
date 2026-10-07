@@ -294,18 +294,69 @@ app.post("/sessions", async (c) => {
   );
 });
 
-const notFound = () => page("Not found", html`<h1>Session not found</h1>`);
+const errorCss = `
+*{box-sizing:border-box}
+body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;display:flex;justify-content:center;padding:32px 24px}
+.error-card{width:100%;max-width:420px;border:1.5px solid #17140F;border-radius:2px;overflow:hidden;background:#F4EFE6;display:flex;flex-direction:column}
+.error-card header{background:#1F2F63;color:#F4EFE6;padding:24px;display:flex;flex-direction:column;gap:6px}
+.error-code{font-family:'Anton',sans-serif;font-size:56px;line-height:1;color:#E3C26E}
+.error-card h1{margin:0;font-weight:800;font-size:20px;line-height:1.15;overflow-wrap:anywhere}
+.error-body{padding:20px 24px 24px;display:flex;flex-direction:column;gap:16px}
+.error-body p{margin:0;font-size:14px;line-height:1.5;color:#5F5648}
+.error-actions{display:flex;flex-direction:column;gap:8px}
+.error-action{display:block;min-height:44px;border:1.5px solid #17140F;border-radius:2px;padding:12px;text-align:center;font-weight:700;font-size:14px;background:#fff;color:#17140F;text-decoration:none}
+.error-action:hover{color:#8F2B22}
+`;
+
+const errorPage = (
+  title: string,
+  code: string,
+  headline: string,
+  message: string,
+  actions: { href: string; label: string }[],
+) => html`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;700;800&display=swap" rel="stylesheet" />
+    <style>${raw(errorCss)}</style>
+  </head>
+  <body>
+    <main class="error-card">
+      <header><span class="error-code">${code}</span><h1>${headline}</h1></header>
+      <div class="error-body">
+        <p>${message}</p>
+        <div class="error-actions">
+          ${actions.map((a) => html`<a class="error-action" href="${a.href}">${a.label}</a>`)}
+        </div>
+      </div>
+    </main>
+  </body>
+</html>`;
+
+const notFoundPage = () =>
+  errorPage(
+    "Not found",
+    "404",
+    "That link doesn’t go anywhere.",
+    "Either it was mistyped or the session was cleared. Ask your organizer for a fresh one.",
+    [{ href: "/", label: "Back to start" }],
+  );
 
 app.get("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(notFound(), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
   return c.html(entryView(session.id, session.pick_count));
 });
 
 app.post("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(notFound(), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
   const raw = await c.req.parseBody({ all: true });
   const result = validateGrid(raw, session.pick_count);
@@ -339,7 +390,7 @@ const organizerMissing = async (c: Context<{ Bindings: Bindings }>, token: strin
   const invited = await findByInviteToken(c.env.DB, token);
   return invited
     ? c.html(organizersOnlyPage(invited.invite_link_token), 403)
-    : c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+    : c.html(notFoundPage(), 404);
 };
 
 app.get("/o/:token", async (c) => {
@@ -497,7 +548,7 @@ const notLocked = () =>
 // Each route resolves only its own token type, so neither link grants the other's capabilities.
 app.get("/i/:token/leaderboard", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return c.html(await leaderboardPage(c.env.DB, session, `/i/${session.invite_link_token}/recap.png`));
 });
@@ -519,7 +570,7 @@ const recap = async (db: D1Database, session: Session) => {
 // Token-scoped (not /sessions/:id) so the image is as unguessable as the leaderboard pages.
 app.get("/i/:token/recap.png", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return recap(c.env.DB, session);
 });
