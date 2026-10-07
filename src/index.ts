@@ -1,5 +1,6 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { html, raw } from "hono/html";
+import { errorCard, shell as uiShell } from "./ui/components";
 import { saveGrid, validateGrid } from "./grids";
 import { entryView, lockedView, submittedView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
@@ -316,9 +317,29 @@ app.post("/i/:token", async (c) => {
     };
     return c.html(entryView(session.id, session.pick_count, values, result.error), 400);
   }
+  // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
+  // Resubmitting under the same email is a deliberate edit/upsert, not an error.
   await saveGrid(c.env.DB, session.id, result.value);
   return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks));
 });
+
+const organizersOnlyPage = (inviteToken: string) =>
+  uiShell(
+    "Organizers only",
+    errorCard("403", "Organizers only.", raw("This page needs the private organizer link. The invite link won't open it."), {
+      href: `/i/${inviteToken}`,
+      label: "Use the invite link",
+    }),
+  );
+
+// Organizer routes: an Invite Link token where the Organizer Link is required is a 403 (wrong link type);
+// any other unknown token stays a 404. Distinct from the locked-Session 403 on the invite routes.
+const organizerMissing = async (c: Context<{ Bindings: Bindings }>, token: string) => {
+  const invited = await findByInviteToken(c.env.DB, token);
+  return invited
+    ? c.html(organizersOnlyPage(invited.invite_link_token), 403)
+    : c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+};
 
 const organizerView = async (db: D1Database, session: Session, token: string, message?: { error?: string; ok?: string }) => {
   const count = await countParticipants(db, session.id);
@@ -356,7 +377,7 @@ const organizerView = async (db: D1Database, session: Session, token: string, me
 app.get("/o/:token", async (c) => {
   const token = c.req.param("token");
   const session = await findByOrganizerToken(c.env.DB, token);
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return organizerMissing(c, token);
   return c.html(await organizerView(c.env.DB, session, token));
 });
 
@@ -364,7 +385,7 @@ app.get("/o/:token", async (c) => {
 app.post("/o/:token/lock", async (c) => {
   const token = c.req.param("token");
   const session = await lockSession(c.env.DB, token);
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return organizerMissing(c, token);
   return c.html(await organizerView(c.env.DB, session, token));
 });
 
@@ -372,7 +393,7 @@ app.post("/o/:token/lock", async (c) => {
 app.post("/o/:token/transcript", async (c) => {
   const token = c.req.param("token");
   const session = await findByOrganizerToken(c.env.DB, token);
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  if (!session) return organizerMissing(c, token);
   if (!session.locked_at) {
     return c.html(
       await organizerView(c.env.DB, session, token, { error: "Lock the Session before uploading a Transcript." }),
@@ -508,8 +529,9 @@ app.get("/i/:token/leaderboard", async (c) => {
 });
 
 app.get("/o/:token/leaderboard", async (c) => {
-  const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  const token = c.req.param("token");
+  const session = await findByOrganizerToken(c.env.DB, token);
+  if (!session) return organizerMissing(c, token);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`));
 });
@@ -529,8 +551,9 @@ app.get("/i/:token/recap.png", async (c) => {
 });
 
 app.get("/o/:token/recap.png", async (c) => {
-  const session = await findByOrganizerToken(c.env.DB, c.req.param("token"));
-  if (!session) return c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+  const token = c.req.param("token");
+  const session = await findByOrganizerToken(c.env.DB, token);
+  if (!session) return organizerMissing(c, token);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return recap(c.env.DB, session);
 });

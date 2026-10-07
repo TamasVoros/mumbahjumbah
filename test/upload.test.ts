@@ -98,7 +98,7 @@ describe("Transcript upload", () => {
 
   it("rejects the invite token and bogus tokens", async () => {
     const s = await lockedSession([["alpha", "beta"]]);
-    expect((await upload(s.invite_link_token, "t.txt", "alpha")).status).toBe(404);
+    expect((await upload(s.invite_link_token, "t.txt", "alpha")).status).toBe(403);
     expect((await upload("nope", "t.txt", "alpha")).status).toBe(404);
     expect(await result(s.id)).toEqual({});
   });
