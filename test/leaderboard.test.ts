@@ -118,6 +118,9 @@ describe("leaderboard routes", () => {
     expect(body).toMatch(/class="row"[^>]*><td class="rk-n">4</);
     // focus ring, 44px touch target on the recap link, no horizontal scroll sources
     expect(body).toContain("a:focus-visible");
+    // 3px ring on mobile (1.5px border + 3px halo), 4px halo on desktop
+    expect(body).toContain("0 0 0 4.5px rgba(31,47,99,.12)");
+    expect(body).toMatch(/min-width:900px\)\{[\s\S]*a:focus-visible\{box-shadow:0 0 0 1\.5px #1F2F63,0 0 0 5\.5px rgba\(31,47,99,\.12\)\}/);
     expect(body).toMatch(/\.recap\{[^}]*min-height:44px/);
     expect(body).not.toMatch(/\bwidth:\s*\d{4,}px/);
   });

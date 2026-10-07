@@ -250,6 +250,8 @@ h1{font-size:26px}h2{font-size:22px}
 .lb-jargon{flex:1;padding:64px}
 .lb-board{flex:0 0 520px;padding:64px}
 h1{font-size:34px}
+a:focus-visible{box-shadow:0 0 0 1.5px #1F2F63,0 0 0 5.5px rgba(31,47,99,.12)}
+.lb-board a:focus-visible{box-shadow:0 0 0 1.5px #F4EFE6,0 0 0 5.5px rgba(244,239,230,.35)}
 .rows .row{min-height:46px}
 .rows .row.winner{min-height:84px}
 .sc-c{font-size:22px}
