@@ -35,14 +35,34 @@ app.get("/health", async (c) => {
   return c.json({ status: "ok" });
 });
 
+const PICK_PRESETS = ["5", "10"] as const;
+
+// Pills are radio inputs, so the form works without JS; :has() reveals the custom field only for Custom.
 const createForm = (error?: string) =>
   page(
     "Create a Session",
     html`<h1>Create a Session</h1>
+      <style>
+        .pills { border: 0; padding: 0; display: flex; gap: 8px; }
+        .pills label { cursor: pointer; }
+        .pills input { position: absolute; opacity: 0; }
+        .pills span { display: inline-block; min-height: 44px; line-height: 44px; padding: 0 18px; border: 1.5px solid #1F2F63; border-radius: 99px; }
+        .pills input:checked + span { background: #1F2F63; color: #fff; }
+        .pills input:focus-visible + span { outline: 2px solid #1F2F63; outline-offset: 2px; }
+        #custom-pick { display: none; }
+        form:has(#pick-custom:checked) #custom-pick { display: block; }
+      </style>
       ${error ? html`<p role="alert">${error}</p>` : ""}
       <form method="post" action="/sessions">
-        <label>Pick Count (any positive whole number, e.g. 9 or 25)
-          <input type="number" name="pick_count" min="1" step="1" value="9" required />
+        <fieldset class="pills">
+          <legend>Pick Count</legend>
+          <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
+          ${PICK_PRESETS.map(
+            (n) => html`<label><input type="radio" name="pick_preset" value="${n}" /><span>${n}</span></label>`,
+          )}
+        </fieldset>
+        <label id="custom-pick">Any positive whole number, e.g. 9 or 25
+          <input type="number" name="pick_count" min="1" step="1" value="9" />
         </label>
         <button type="submit">Create Session</button>
       </form>`,
@@ -52,7 +72,12 @@ app.get("/", (c) => c.html(createForm()));
 
 app.post("/sessions", async (c) => {
   const form = await c.req.parseBody();
-  const pickCount = parsePickCount(form["pick_count"]);
+  // A preset pill supplies the count directly; Custom (or no preset) reads the number input.
+  // Either way the value goes through the same parsePickCount validation.
+  const preset = form["pick_preset"];
+  const raw =
+    typeof preset === "string" && (PICK_PRESETS as readonly string[]).includes(preset) ? preset : form["pick_count"];
+  const pickCount = parsePickCount(raw);
   if (pickCount === null) {
     return c.html(createForm("Pick Count must be a positive whole number."), 400);
   }

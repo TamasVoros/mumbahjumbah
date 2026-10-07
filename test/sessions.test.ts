@@ -9,6 +9,14 @@ async function create(pick: string) {
   });
 }
 
+async function createPreset(preset: string, pick: string) {
+  return SELF.fetch("https://example.com/sessions", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ pick_preset: preset, pick_count: pick }),
+  });
+}
+
 function links(body: string) {
   const invite = /id="invite-link" href="([^"]+)"/.exec(body)![1]!;
   const organizer = /id="organizer-link" href="([^"]+)"/.exec(body)![1]!;
@@ -19,7 +27,35 @@ describe("Create Session", () => {
   it("serves the form", async () => {
     const res = await SELF.fetch("https://example.com/");
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain('name="pick_count"');
+    const body = await res.text();
+    expect(body).toContain('name="pick_count"');
+    const pills = [...body.matchAll(/<input type="radio" name="pick_preset" [^>]*>/g)].map((m) => m[0]);
+    expect(pills.map((p) => /value="([^"]+)"/.exec(p)![1])).toEqual(["custom", "5", "10"]);
+    expect(pills[0]).toContain("checked");
+    expect(pills.slice(1).some((p) => p.includes("checked"))).toBe(false);
+  });
+
+  it("submits a preset pill's count directly, ignoring the number input", async () => {
+    for (const n of [5, 10]) {
+      const res = await createPreset(String(n), "abc");
+      expect(res.status).toBe(201);
+      const token = links(await res.text()).invite.split("/i/")[1]!;
+      const row = await env.DB.prepare("SELECT pick_count FROM sessions WHERE invite_link_token = ?")
+        .bind(token)
+        .first<{ pick_count: number }>();
+      expect(row!.pick_count).toBe(n);
+    }
+  });
+
+  it("Custom preset validates the number input like before", async () => {
+    expect((await createPreset("custom", "13")).status).toBe(201);
+    for (const n of ["0", "-3", "2.5", "abc", ""]) {
+      expect((await createPreset("custom", n)).status).toBe(400);
+    }
+  });
+
+  it("treats an unknown preset value as Custom and validates the number input", async () => {
+    expect((await createPreset("9", "")).status).toBe(400);
   });
 
   it("persists a session under the seed operator with distinct, resolving links", async () => {
