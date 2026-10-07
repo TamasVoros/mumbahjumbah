@@ -67,3 +67,15 @@ export async function processTranscript(db: D1Database, sessionId: number, file:
   await replaceJargonResult(db, sessionId, result);
   return { ok: true, result };
 }
+
+/** How many Participants picked each distinct term (picks are stored normalized, as are Jargon Result terms). */
+export async function getPickerCounts(db: D1Database, sessionId: number): Promise<Map<string, number>> {
+  const { results } = await db
+    .prepare(
+      `SELECT pk.pick AS term, COUNT(*) AS n FROM picks pk JOIN participants p ON p.id = pk.participant_id
+       WHERE p.session_id = ? GROUP BY pk.pick`,
+    )
+    .bind(sessionId)
+    .all<{ term: string; n: number }>();
+  return new Map(results.map((r) => [r.term, r.n]));
+}

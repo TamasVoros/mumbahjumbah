@@ -67,3 +67,14 @@ export function lockSession(db: D1Database, organizerToken: string) {
     .bind(organizerToken)
     .first<Session>();
 }
+
+export type ParticipantRow = { display_name: string; updated_at: string };
+
+/** Names only (never emails), oldest first, for the Organizer's participant list. */
+export async function listParticipants(db: D1Database, sessionId: number): Promise<ParticipantRow[]> {
+  const { results } = await db
+    .prepare("SELECT display_name, updated_at FROM participants WHERE session_id = ? ORDER BY created_at, id")
+    .bind(sessionId)
+    .all<ParticipantRow>();
+  return results;
+}
