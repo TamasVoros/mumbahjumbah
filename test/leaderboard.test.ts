@@ -80,6 +80,9 @@ describe("getLeaderboard", () => {
   });
 });
 
+const cells = (rank: number, name: string, score: number) =>
+  `<td class="rk-n">${rank}</td><td class="nm-c">${name}</td><td class="sc-c">${score}</td>`;
+
 describe("leaderboard routes", () => {
   it("is served via both the Invite Link and Organizer Link and reflects re-uploads", async () => {
     const s = await setup();
@@ -88,14 +91,38 @@ describe("leaderboard routes", () => {
       const res = await SELF.fetch(`https://example.com${path}`);
       expect(res.status).toBe(200);
       const body = await res.text();
-      expect(body).toContain("<td>1</td><td>Bold</td><td>5</td>");
-      expect(body).toContain("<td>5</td><td>Zero2</td><td>0</td>");
+      expect(body).toContain(cells(1, "Bold", 5));
+      expect(body).toContain(cells(5, "Zero2", 0));
       expect(body).not.toContain("a@x.com");
     }
     await upload(s.organizer_link_token, "ai ai ai ai");
     const body = await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}/leaderboard`)).text();
-    expect(body).toContain("<td>1</td><td>Bold</td><td>4</td>");
-    expect(body).toContain("<td>2</td><td>TieLate</td><td>4</td>");
+    expect(body).toContain(cells(1, "Bold", 4));
+    expect(body).toContain(cells(2, "TieLate", 4));
+  });
+
+  it("applies the DESIGN.md leaderboard styling", async () => {
+    const s = await setup();
+    await upload(s.organizer_link_token, T1);
+    const body = await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}/leaderboard`)).text();
+    expect(body).toContain('name="viewport"');
+    for (const font of ["Archivo", "Anton", "JetBrains+Mono"]) expect(body).toContain(font);
+    for (const hex of ["#1F2F63", "#172352", "#3C4E8A", "#2B3F7A", "#E3C26E", "#7A6A3A", "#F4EFE6"]) expect(body).toContain(hex);
+    // split-pane on desktop, single column (jargon above leaderboard) on mobile
+    expect(body).toMatch(/@media\(min-width:900px\)\{\s*\.lb-page\{flex-direction:row\}/);
+    expect(body.indexOf('class="lb-jargon"')).toBeLessThan(body.indexOf('class="lb-board"'));
+    // rank 1 raffia winner row, ranks 2-3 podium rows, rest plain indigo rows
+    expect(body).toMatch(/class="row winner"[^>]*><td class="rk-n">1</);
+    expect(body).toMatch(/class="row podium"[^>]*><td class="rk-n">2</);
+    expect(body).toMatch(/class="row podium"[^>]*><td class="rk-n">3</);
+    expect(body).toMatch(/class="row"[^>]*><td class="rk-n">4</);
+    // focus ring, 44px touch target on the recap link, no horizontal scroll sources
+    expect(body).toContain("a:focus-visible");
+    // 3px ring on mobile (1.5px border + 3px halo), 4px halo on desktop
+    expect(body).toContain("0 0 0 4.5px rgba(31,47,99,.12)");
+    expect(body).toMatch(/min-width:900px\)\{[\s\S]*a:focus-visible\{box-shadow:0 0 0 1\.5px #1F2F63,0 0 0 5\.5px rgba\(31,47,99,\.12\)\}/);
+    expect(body).toMatch(/\.recap\{[^}]*min-height:44px/);
+    expect(body).not.toMatch(/\bwidth:\s*\d{4,}px/);
   });
 
   it("tokens only resolve through their own finder", async () => {
