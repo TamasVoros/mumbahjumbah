@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
 import { getLeaderboard } from "./leaderboard";
+import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
@@ -45,10 +46,13 @@ const createForm = (error?: string) =>
           <input type="number" name="pick_count" min="1" step="1" value="9" required />
         </label>
         <button type="submit">Create Session</button>
-      </form>`,
+      </form>
+      <p><a href="/plans">See plans</a></p>`,
   );
 
 app.get("/", (c) => c.html(createForm()));
+
+app.get("/plans", (c) => c.html(plansPage()));
 
 app.post("/sessions", async (c) => {
   const form = await c.req.parseBody();
