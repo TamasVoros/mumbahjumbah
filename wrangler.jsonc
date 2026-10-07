@@ -14,5 +14,24 @@
       "database_id": "e8fd6db9-03c5-4dba-8df9-e25de8ba3e7a",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  // Dev environment: its own Worker (mumbahjumbah-dev.<subdomain>.workers.dev) and its own D1 database.
+  // Bindings and build settings are not inherited, so they are repeated here.
+  "env": {
+    "dev": {
+      "name": "mumbahjumbah-dev",
+      "workers_dev": true,
+      "alias": { "harfbuzzjs": "./src/harfbuzz-shim.ts", "fs": "./src/empty-shim.ts", "path": "./src/empty-shim.ts" },
+      "rules": [{ "type": "Data", "globs": ["**/*.woff"], "fallthrough": true }],
+      "observability": { "enabled": true },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "mumbahjumbah-dev",
+          "database_id": "a4521017-f220-4181-babf-d19ff6f8ce9f",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
 }
