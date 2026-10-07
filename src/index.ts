@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import { saveGrid, validateGrid } from "./grids";
 import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
@@ -19,12 +19,140 @@ export type Bindings = { DB: D1Database };
 
 export const app = new Hono<{ Bindings: Bindings }>();
 
-const page = (title: string, body: unknown) => html`<!doctype html>
+const ZIGZAG =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 12L8 4L16 12' fill='none' stroke='%23D2432C' stroke-width='2.5'/%3E%3C/svg%3E\")";
+
+// Shared stylesheet (DESIGN.md direction 2A). Server-rendered and inline: no frontend framework.
+const CSS = `
+:root { --indigo:#1F2F63; --bone:#F4EFE6; --paper:#fff; --ink:#17140F; --muted:#5F5648; --placeholder:#8A8070; --red:#D2432C; --red-hover:#8F2B22; --raffia:#E3C26E; --ring:rgba(31,47,99,.12); }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bone); color: var(--ink); font: 400 15px/1.5 Archivo, system-ui, sans-serif; overflow-x: hidden; }
+h1, h2, h3, p { margin: 0; }
+a { color: var(--red); }
+a:hover { color: var(--red-hover); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+.on-indigo a:focus-visible { outline-color: var(--raffia); }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.mono.accent { color: var(--raffia); }
+.wrap { padding-left: 24px; padding-right: 24px; }
+.container { max-width: 1120px; margin: 0 auto; }
+.hero { background: var(--indigo); color: var(--bone); padding-bottom: 32px; }
+.nav { display: flex; align-items: center; justify-content: space-between; padding-top: 20px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: inherit; text-decoration: none; }
+.brand:hover { color: inherit; }
+.hero-grid { display: grid; gap: 28px; margin-top: 22px; }
+.hero-copy { display: flex; flex-direction: column; gap: 14px; }
+.hero h1 { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -.01em; }
+.hero-copy p { font-size: 15px; color: var(--bone); }
+.hero-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.btn { display: block; border-radius: 2px; padding: 15px; text-align: center; font: 700 16px/1.3 Archivo, system-ui, sans-serif; text-decoration: none; cursor: pointer; border: 1.5px solid transparent; min-height: 48px; }
+.btn-red { background: var(--red); color: #fff; width: 100%; }
+.btn-red:hover { color: #fff; background: var(--red-hover); }
+.btn-outline { border-color: var(--ink); color: var(--ink); }
+.btn-outline:hover { color: var(--ink); }
+.btn-bone { border-color: var(--bone); color: var(--bone); }
+.btn-bone:hover { color: var(--bone); }
+.card { background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 2px; overflow: hidden; }
+.card-body { padding: 24px 20px; display: flex; flex-direction: column; gap: 22px; }
+.card h2 { font-weight: 800; font-size: 26px; line-height: 1.1; }
+.hint { font-size: 13px; line-height: 1.45; color: var(--muted); }
+.error { border: 1.5px solid var(--red); border-radius: 2px; padding: 12px 14px; font-weight: 600; }
+.pills { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.pills legend { padding: 0; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.pills .row { display: flex; gap: 8px; }
+.pills label { flex: 1; cursor: pointer; position: relative; display: block; }
+.pills input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.pills span { display: block; text-align: center; min-height: 48px; line-height: 45px; padding: 0 8px; border: 1.5px solid var(--ink); border-radius: 2px; background: var(--paper); font-weight: 700; }
+.pills input:checked + span { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+.pills input:focus-visible + span { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring), 0 0 0 5px var(--indigo); }
+#custom-pick { display: none; }
+form:has(#pick-custom:checked) #custom-pick { display: flex; }
+.field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700; }
+.field input { font: 400 15px Archivo, system-ui, sans-serif; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 2px; padding: 13px 14px; min-height: 52px; width: 100%; color: var(--ink); }
+.field input::placeholder { color: var(--placeholder); }
+.field input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring); }
+.zig { height: 16px; background: ${ZIGZAG} repeat-x; margin: 0 -20px 8px; }
+.section { padding-top: 40px; padding-bottom: 8px; display: flex; flex-direction: column; gap: 24px; }
+.steps { display: flex; flex-direction: column; gap: 24px; }
+.step { display: flex; gap: 14px; }
+.step .n { font: 400 26px/1 Anton, Impact, sans-serif; color: var(--indigo); width: 22px; flex: none; }
+.step h3 { font-weight: 700; font-size: 15px; }
+.step p { font-size: 13px; line-height: 1.45; color: var(--muted); margin-top: 3px; }
+.who { padding-top: 32px; padding-bottom: 32px; display: flex; flex-direction: column; gap: 14px; }
+.who .card { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
+.who h3 { font-weight: 800; font-size: 17px; }
+.who p { font-size: 13px; line-height: 1.45; color: var(--muted); }
+.band { background: var(--raffia); padding-top: 32px; padding-bottom: 32px; }
+.band .container { display: flex; flex-direction: column; gap: 14px; }
+.band h2 { font-weight: 800; font-size: 24px; line-height: 1.15; }
+.band .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.band .btn { padding: 13px 18px; font-size: 15px; width: auto; }
+.foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 20px; padding-bottom: 28px; font-size: 12px; color: var(--muted); }
+.plain { padding-top: 32px; padding-bottom: 32px; max-width: 720px; margin: 0 auto; }
+@media (min-width: 900px) {
+  .wrap { padding-left: 80px; padding-right: 80px; }
+  .nav { height: 88px; padding-top: 0; }
+  .brand { font-size: 20px; gap: 10px; }
+  .hero { padding-bottom: 88px; }
+  .hero-grid { grid-template-columns: 1.15fr 1fr; gap: 80px; align-items: center; margin-top: 40px; }
+  .hero-copy { gap: 22px; }
+  .hero h1 { font-size: 68px; line-height: 1.02; letter-spacing: -.02em; }
+  .hero-copy p { font-size: 19px; max-width: 520px; }
+  .hero-actions { flex-direction: row; gap: 14px; margin-top: 10px; }
+  .hero .btn { width: auto; padding: 17px 32px; font-size: 17px; }
+  .mono.accent { font-size: 13px; }
+  .card-body { padding: 36px 36px 28px; gap: 24px; }
+  .card h2 { font-size: 32px; }
+  .zig { margin: 0 -36px 8px; }
+  .field input { font-size: 16px; }
+  .pills .row { gap: 10px; }
+  .field input:focus { box-shadow: 0 0 0 4px var(--ring); }
+  .pills input:focus-visible + span { box-shadow: 0 0 0 4px var(--ring), 0 0 0 6px var(--indigo); }
+  .section { padding: 80px 0; display: grid; grid-template-columns: 1fr 2fr; gap: 64px; }
+  .section h2 { font-weight: 800; font-size: 34px; line-height: 1.1; margin-top: 12px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  .step { flex-direction: column; gap: 10px; }
+  .step .n { font-size: 44px; width: auto; }
+  .step h3 { font-size: 18px; }
+  .step p { font-size: 14px; line-height: 1.5; margin-top: 0; }
+  .who { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 0 0 80px; }
+  .who .mono { grid-column: 1 / -1; }
+  .who .card { padding: 32px; gap: 8px; }
+  .who h3 { font-size: 24px; }
+  .who p { font-size: 15px; line-height: 1.5; }
+  .band { padding-top: 56px; padding-bottom: 56px; }
+  .band .container { flex-direction: row; align-items: center; justify-content: space-between; }
+  .band h2 { font-size: 34px; line-height: 1.1; }
+  .band .btn { padding: 16px 28px; font-size: 16px; }
+  .foot { padding-top: 28px; font-size: 13px; }
+}
+`;
+
+const logo = (fill: string, cut: string, w: number, h: number) =>
+  html`<svg width="${w}" height="${h}" viewBox="0 0 64 84" aria-hidden="true"><path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="${fill}"/><path d="M12 24L32 12L52 24" fill="none" stroke="${cut}" stroke-width="5"/><path d="M13 40L28 36L22 48Z" fill="${cut}"/><path d="M51 40L36 36L42 48Z" fill="${cut}"/><path d="M32 54L38 64L32 76L26 64Z" fill="${cut}"/></svg>`;
+
+// Other pages get a plain readable column until they are restyled; the landing page is full-bleed (bare).
+const page = (title: string, content: unknown, bare = false) => {
+  const body = bare ? content : html`<main class="plain wrap">${content}</main>`;
+  return shell(title, body);
+};
+
+const shell = (title: string, body: unknown) => html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
+    />
+    <style>
+      ${raw(CSS)}
+    </style>
   </head>
   <body>
     ${body}
@@ -36,18 +164,100 @@ app.get("/health", async (c) => {
   return c.json({ status: "ok" });
 });
 
+const PICK_PRESETS = ["5", "10"] as const;
+
+// Pills are radio inputs, so the form works without JS; :has() reveals the custom field only for Custom.
 const createForm = (error?: string) =>
   page(
-    "Create a Session",
-    html`<h1>Create a Session</h1>
-      ${error ? html`<p role="alert">${error}</p>` : ""}
-      <form method="post" action="/sessions">
-        <label>Pick Count (any positive whole number, e.g. 9 or 25)
-          <input type="number" name="pick_count" min="1" step="1" value="9" required />
-        </label>
-        <button type="submit">Create Session</button>
-      </form>
-      <p><a href="/plans">See plans</a></p>`,
+    "MumbahJumbah: Predict the jargon. Win the meeting.",
+    html`<header class="hero on-indigo">
+        <div class="wrap">
+          <div class="container">
+            <nav class="nav" aria-label="Main">
+              <a class="brand" href="/">${logo("#F4EFE6", "#1F2F63", 18, 24)}<span>MumbahJumbah</span></a>
+            </nav>
+            <div class="hero-grid">
+              <div class="hero-copy">
+                <div class="mono accent">Reverse bingo for meetings</div>
+                <h1>Predict the jargon. Win the meeting.</h1>
+                <p>Guess the buzzwords before the call. Get scored against the transcript after.</p>
+                <div class="hero-actions">
+                  <a class="btn btn-red" href="#new">Create a session</a>
+                  <a class="btn btn-bone" href="#how">See how it works</a>
+                </div>
+              </div>
+              <div class="card" id="new">
+                <form method="post" action="/sessions" class="card-body">
+                  <h2>New session</h2>
+                  ${error ? html`<p class="error" role="alert">${error}</p>` : ""}
+                  <fieldset class="pills">
+                    <legend>Pick Count</legend>
+                    <div class="row">
+                      <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
+                      ${PICK_PRESETS.map(
+                        (n) => html`<label><input type="radio" name="pick_preset" value="${n}" /><span>${n}</span></label>`,
+                      )}
+                    </div>
+                    <p class="hint">Each player submits exactly this many words or phrases.</p>
+                  </fieldset>
+                  <label class="field" id="custom-pick">Any positive whole number, e.g. 9 or 25
+                    <input type="number" name="pick_count" min="1" step="1" value="9" inputmode="numeric" />
+                  </label>
+                  <div>
+                    <div class="zig" aria-hidden="true"></div>
+                    <button type="submit" class="btn btn-red">Create Session</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main>
+        <section class="wrap" id="how">
+          <div class="container section">
+            <div>
+              <div class="mono">How it works</div>
+              <h2>Three steps. One of them is a meeting.</h2>
+            </div>
+            <div class="steps">
+              <div class="step"><span class="n">1</span><div><h3>Create a session</h3><p>Pick how many words each player gets. Share the invite link.</p></div></div>
+              <div class="step"><span class="n">2</span><div><h3>Everyone predicts</h3><p>Each player locks in their jargon picks before the call.</p></div></div>
+              <div class="step"><span class="n">3</span><div><h3>Meeting, then scores</h3><p>Upload the transcript after. The leaderboard writes itself.</p></div></div>
+            </div>
+          </div>
+        </section>
+        <section class="wrap">
+          <div class="container who">
+            <div class="mono">Who it’s for</div>
+            <div class="card"><h3>Teams</h3><p>A two-minute warm-up that makes the all-hands worth listening to.</p></div>
+            <div class="card"><h3>Coaches &amp; facilitators</h3><p>Run it in your workshops, under your own brand and link.</p></div>
+          </div>
+        </section>
+        <section class="band wrap">
+          <div class="container">
+            <h2>Free for a team. Branded for a coach.</h2>
+            <div class="actions"><a class="btn btn-red" href="#new">Create a session</a></div>
+          </div>
+        </section>
+      </main>
+      <footer class="wrap"><div class="container foot"><span>© MumbahJumbah</span><span><a href="/plans">Plans</a> · Privacy · Terms</span></div></footer>
+      <script>
+        // Only the Custom number input takes part in validation and submission; for 5/10 it is disabled,
+        // so a stale invalid value in the hidden field can never block a preset submit.
+        (function () {
+          var form = document.querySelector('form[action="/sessions"]');
+          var input = form.querySelector('input[name="pick_count"]');
+          function sync() {
+            var custom = form.querySelector("#pick-custom").checked;
+            input.disabled = !custom;
+            input.required = custom;
+          }
+          form.addEventListener("change", sync);
+          sync();
+        })();
+      </script>`,
+    true,
   );
 
 app.get("/", (c) => c.html(createForm()));
@@ -56,7 +266,12 @@ app.get("/plans", (c) => c.html(plansPage()));
 
 app.post("/sessions", async (c) => {
   const form = await c.req.parseBody();
-  const pickCount = parsePickCount(form["pick_count"]);
+  // A preset pill supplies the count directly; Custom (or no preset) reads the number input.
+  // Either way the value goes through the same parsePickCount validation.
+  const preset = form["pick_preset"];
+  const raw =
+    typeof preset === "string" && (PICK_PRESETS as readonly string[]).includes(preset) ? preset : form["pick_count"];
+  const pickCount = parsePickCount(raw);
   if (pickCount === null) {
     return c.html(createForm("Pick Count must be a positive whole number."), 400);
   }
