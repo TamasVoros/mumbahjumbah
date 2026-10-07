@@ -241,7 +241,7 @@ const createForm = (error?: string) =>
           </div>
         </section>
       </main>
-      <footer class="wrap"><div class="container foot"><span>© MumbahJumbah</span><span><a href="/plans">Plans</a> · Privacy · Terms</span></div></footer>
+      <footer class="wrap"><div class="container foot"><span>© MumbahJumbah</span><span><a href="/plans">See plans</a> · Privacy · Terms</span></div></footer>
       <script>
         // Only the Custom number input takes part in validation and submission; for 5/10 it is disabled,
         // so a stale invalid value in the hidden field can never block a preset submit.
