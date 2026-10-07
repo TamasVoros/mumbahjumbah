@@ -517,7 +517,7 @@ app.get("/o/:token/leaderboard", async (c) => {
 const recap = async (db: D1Database, session: Session) => {
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   const png = await renderRecapPng(board, jargon);
-  return new Response(png, { headers: { "content-type": "image/png", "cache-control": "no-store" } });
+  return new Response(new Uint8Array(png), { headers: { "content-type": "image/png", "cache-control": "no-store" } });
 };
 
 // Token-scoped (not /sessions/:id) so the image is as unguessable as the leaderboard pages.

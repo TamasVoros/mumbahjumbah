@@ -18,7 +18,7 @@ const lock = (token: string) => SELF.fetch(`https://example.com/o/${token}/lock`
 
 function upload(token: string, name: string, content: string | Uint8Array) {
   const form = new FormData();
-  if (name) form.set("transcript", new File([content], name));
+  if (name) form.set("transcript", new File([typeof content === "string" ? content : new Uint8Array(content)], name));
   return SELF.fetch(`https://example.com/o/${token}/transcript`, { method: "POST", body: form });
 }
 
