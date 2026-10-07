@@ -44,7 +44,7 @@ const createForm = (error?: string) =>
     html`<h1>Create a Session</h1>
       <style>
         .pills { border: 0; padding: 0; display: flex; gap: 8px; }
-        .pills label { cursor: pointer; }
+        .pills label { cursor: pointer; position: relative; }
         .pills input { position: absolute; opacity: 0; }
         .pills span { display: inline-block; min-height: 44px; line-height: 44px; padding: 0 18px; border: 1.5px solid #1F2F63; border-radius: 99px; }
         .pills input:checked + span { background: #1F2F63; color: #fff; }
