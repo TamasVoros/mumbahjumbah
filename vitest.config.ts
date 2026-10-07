@@ -4,14 +4,28 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig(async () => {
   const migrations = await readD1Migrations("./migrations");
+  const alias = { harfbuzzjs: resolve("src/harfbuzz-shim.ts") };
   return {
-    resolve: { alias: { harfbuzzjs: resolve("src/harfbuzz-shim.ts") } },
-    plugins: [
-      cloudflareTest({
-        wrangler: { configPath: "./wrangler.jsonc" },
-        miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
-      }),
-    ],
-    test: { include: ["test/**/*.test.ts"], setupFiles: ["./test/setup.ts"] },
+    test: {
+      projects: [
+        {
+          resolve: { alias },
+          plugins: [
+            cloudflareTest({
+              wrangler: { configPath: "./wrangler.jsonc" },
+              miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+            }),
+          ],
+          test: {
+            name: "workers",
+            include: ["test/**/*.test.ts"],
+            exclude: ["test/dom/**"],
+            setupFiles: ["./test/setup.ts"],
+          },
+        },
+        // Browser-behaviour tests run under jsdom in plain Node (workerd has no DOM).
+        { test: { name: "dom", include: ["test/dom/**/*.test.ts"], environment: "node" } },
+      ],
+    },
   };
 });
