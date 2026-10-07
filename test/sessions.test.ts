@@ -61,7 +61,62 @@ describe("Create Session", () => {
   it("hides the number input via CSS unless Custom is checked", async () => {
     const body = await (await SELF.fetch("https://example.com/")).text();
     expect(body).toContain("#custom-pick { display: none; }");
-    expect(body).toContain("form:has(#pick-custom:checked) #custom-pick { display: block; }");
+    expect(body).toContain("form:has(#pick-custom:checked) #custom-pick { display: flex; }");
+  });
+
+  describe("landing page design (DESIGN.md 2A)", () => {
+    const get = async () => (await SELF.fetch("https://example.com/")).text();
+
+    it("loads Archivo/Anton/JetBrains Mono and uses the palette tokens", async () => {
+      const body = await get();
+      for (const f of ["Archivo", "Anton", "JetBrains+Mono"]) expect(body).toContain(f);
+      for (const c of ["#1F2F63", "#F4EFE6", "#D2432C", "#E3C26E", "#17140F"]) expect(body).toContain(c);
+      expect(body).toContain("1.5px solid var(--ink)");
+      expect(body).toContain("border-radius: 2px");
+    });
+
+    it("has marketing sections: hero, how it works, who it's for, bottom CTA band, footer", async () => {
+      const body = await get();
+      expect(body).toContain("Predict the jargon. Win the meeting.");
+      expect(body).toContain('id="how"');
+      expect(body).toContain("Three steps. One of them is a meeting.");
+      expect(body).toContain("Coaches &amp; facilitators");
+      expect(body).toContain("Free for a team. Branded for a coach.");
+      expect(body).toContain("<footer");
+    });
+
+    it("puts exactly one zigzag directly above the Create Session button, and nowhere else", async () => {
+      const body = await get();
+      expect(body.match(/class="zig"/g)).toHaveLength(1);
+      expect(body).toMatch(/class="zig"[^>]*><\/div>\s*<button type="submit" class="btn btn-red">Create Session<\/button>/);
+    });
+
+    it("styles the pick-count pills as a segmented control with 44px+ targets", async () => {
+      const body = await get();
+      expect(body).toContain(".pills .row { display: flex;");
+      expect(body).toMatch(/\.pills span \{[^}]*min-height: 48px/);
+      expect(body).toMatch(/\.pills input:checked \+ span \{ background: var\(--indigo\)/);
+    });
+
+    it("defines focus rings and is responsive without horizontal scroll", async () => {
+      const body = await get();
+      expect(body).toContain("box-shadow: 0 0 0 3px var(--ring)");
+      expect(body).toContain("rgba(31,47,99,.12)");
+      expect(body).toContain("0 0 0 4px var(--ring)");
+      expect(body).toContain("a:focus-visible, button:focus-visible");
+      expect(body).toContain("overflow-x: hidden");
+      expect(body).toContain('name="viewport"');
+      expect(body).toContain("@media (min-width: 900px)");
+    });
+
+    it("renders the error state in the new layout", async () => {
+      const res = await createPreset("custom", "0");
+      expect(res.status).toBe(400);
+      const body = await res.text();
+      expect(body).toContain('role="alert"');
+      expect(body).toContain("Pick Count must be a positive whole number.");
+      expect(body).toContain("New session");
+    });
   });
 
   it("submits a preset pill's count directly, ignoring the number input", async () => {
