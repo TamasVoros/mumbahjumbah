@@ -24,6 +24,16 @@ describe("Organizers only 403 (wrong link type)", () => {
     }
   });
 
+  it("renders the 8A 403 card with the design tokens and a link back to the invite page", async () => {
+    const s = await createSession(env.DB, 2);
+    const body = await (await SELF.fetch(`${base}/o/${s.invite_link_token}`)).text();
+    expect(body).toContain('class="err-card"');
+    expect(body).toContain('<span class="code">403</span>');
+    expect(body).toContain("--indigo:#1F2F63");
+    expect(body).toContain(`href="/i/${s.invite_link_token}"`);
+    expect(body).toContain("Use the invite link");
+  });
+
   it("does not lock the Session when attempted with the invite token", async () => {
     const s = await createSession(env.DB, 2);
     await post(`/o/${s.invite_link_token}/lock`);

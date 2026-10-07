@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
+import { errorCard, shell } from "./ui/components";
 import { saveGrid, validateGrid } from "./grids";
 import { getLeaderboard } from "./leaderboard";
 import { renderRecapPng } from "./recap";
@@ -135,18 +136,23 @@ app.post("/i/:token", async (c) => {
   );
 });
 
-const organizersOnlyPage = () =>
-  page(
+const organizersOnlyPage = (inviteToken: string) =>
+  shell(
     "Organizers only",
-    html`<h1>Organizers only</h1><p>This page needs the private organizer link. The invite link won't open it.</p>`,
+    errorCard("403", "Organizers only.", raw("This page needs the private organizer link. The invite link won't open it."), {
+      href: `/i/${inviteToken}`,
+      label: "Use the invite link",
+    }),
   );
 
 // Organizer routes: an Invite Link token where the Organizer Link is required is a 403 (wrong link type);
 // any other unknown token stays a 404. Distinct from the locked-Session 403 on the invite routes.
-const organizerMissing = async (c: Context<{ Bindings: Bindings }>, token: string) =>
-  (await findByInviteToken(c.env.DB, token))
-    ? c.html(organizersOnlyPage(), 403)
+const organizerMissing = async (c: Context<{ Bindings: Bindings }>, token: string) => {
+  const invited = await findByInviteToken(c.env.DB, token);
+  return invited
+    ? c.html(organizersOnlyPage(invited.invite_link_token), 403)
     : c.html(page("Not found", html`<h1>Session not found</h1>`), 404);
+};
 
 const organizerView = async (db: D1Database, session: Session, token: string, message?: { error?: string; ok?: string }) => {
   const count = await countParticipants(db, session.id);
