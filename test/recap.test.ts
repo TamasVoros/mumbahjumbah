@@ -43,11 +43,62 @@ describe("renderRecapPng", () => {
   });
 });
 
+const be32 = (b: Uint8Array, o: number) => ((b[o]! << 24) | (b[o + 1]! << 16) | (b[o + 2]! << 8) | b[o + 3]!) >>> 0;
+
+describe("recap PNG dimensions", () => {
+  it("is 1200x630", async () => {
+    const png = await renderRecapPng(
+      [{ rank: 1, participantId: 1, displayName: "Marcus", score: 58 }],
+      [{ term: "synergy", occurrences: 7 }],
+    );
+    expect(be32(png, 16)).toBe(1200);
+    expect(be32(png, 20)).toBe(630);
+  });
+});
+
 describe("recapLayout", () => {
-  it("lists top terms by occurrences desc and says so when nothing matched", () => {
-    const t = text(recapLayout([], [{ term: "a", occurrences: 1 }, { term: "b", occurrences: 9 }]));
-    expect(t.indexOf("b")).toBeLessThan(t.lastIndexOf("a "));
+  const board = [
+    { rank: 1, participantId: 1, displayName: "Marcus", score: 58 },
+    { rank: 2, participantId: 2, displayName: "Priya", score: 41 },
+    { rank: 3, participantId: 3, displayName: "Jo", score: 33 },
+    { rank: 4, participantId: 4, displayName: "Fourth", score: 1 },
+  ];
+
+  it("shows headline, stat line with the most-said word, and only the top 3", () => {
+    const t = text(recapLayout(board, [{ term: "a", occurrences: 1 }, { term: "synergy", occurrences: 7 }]));
+    expect(t).toContain("Marcus called it.");
+    expect(t).toContain("58 points.");
+    expect(t).toContain("“synergy”");
+    expect(t).toContain("7 times");
+    expect(t).toContain("Priya");
+    expect(t).toContain("Jo");
+    expect(t).not.toContain("Fourth");
+    expect(t).toContain("4 PLAYERS");
+    expect(t).toContain("PREDICT THE JARGON. WIN THE MEETING.");
+    expect(t).toContain("MUMBAHJUMBAH.COM");
+  });
+
+  it("keeps a non-collapsible space between the label and the bold word", () => {
+    const raw = (n: unknown): string =>
+      typeof n === "string" ? n : Array.isArray(n) ? n.map(raw).join("") : n && typeof n === "object" ? raw((n as { props: { children?: unknown } }).props.children) : "";
+    expect(raw(recapLayout(board, [{ term: "synergy", occurrences: 7 }]))).toContain("Most-said word: “synergy”");
+  });
+
+  it("says so when nothing matched, and handles an empty board", () => {
     expect(text(recapLayout([], []))).toContain("No picks matched");
+    expect(text(recapLayout([], []))).toContain("No Grids, no winner.");
+  });
+
+  it("uses the brand palette and fonts, with logo mark and full-width zigzag", () => {
+    const json = JSON.stringify(recapLayout(board, []));
+    expect(json).toContain("#1F2F63"); // indigo ground
+    expect(json).toContain("#E3C26E"); // raffia 1st place
+    expect(json).toContain("#3C4E8A"); // indigo-line 2nd/3rd
+    for (const f of ["Archivo", "Anton", "JetBrains Mono"]) expect(json).toContain(f);
+    expect(json).not.toContain("Inter");
+    const srcs = [...json.matchAll(/data:image\/svg\+xml;base64,([A-Za-z0-9+/=]+)/g)].map((m) => atob(m[1]!));
+    expect(srcs.some((s) => s.includes('viewBox="0 0 64 84"'))).toBe(true);
+    expect(srcs.some((s) => s.includes('width="1200"') && s.includes("#D2432C"))).toBe(true);
   });
 });
 
