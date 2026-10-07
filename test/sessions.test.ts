@@ -54,7 +54,7 @@ describe("Create Session", () => {
     expect(await org.text()).toContain(`Session ${row!.id}`);
 
     // Tokens are not interchangeable between routes.
-    expect((await SELF.fetch(`https://example.com/o/${inviteToken}`)).status).toBe(404);
+    expect((await SELF.fetch(`https://example.com/o/${inviteToken}`)).status).toBe(403);
     expect((await SELF.fetch(`https://example.com/i/${organizerToken}`)).status).toBe(404);
   });
 

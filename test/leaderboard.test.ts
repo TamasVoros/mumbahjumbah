@@ -101,7 +101,7 @@ describe("leaderboard routes", () => {
   it("tokens only resolve through their own finder", async () => {
     const s = await setup();
     expect((await SELF.fetch(`https://example.com/i/${s.organizer_link_token}/leaderboard`)).status).toBe(404);
-    expect((await SELF.fetch(`https://example.com/o/${s.invite_link_token}/leaderboard`)).status).toBe(404);
+    expect((await SELF.fetch(`https://example.com/o/${s.invite_link_token}/leaderboard`)).status).toBe(403);
   });
 
   it("is not available before the Session is locked", async () => {

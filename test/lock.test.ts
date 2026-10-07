@@ -32,7 +32,7 @@ describe("Organizer view", () => {
 
   it("does not resolve an invite token", async () => {
     const s = await createSession(env.DB, 2);
-    expect((await SELF.fetch(`https://example.com/o/${s.invite_link_token}`)).status).toBe(404);
+    expect((await SELF.fetch(`https://example.com/o/${s.invite_link_token}`)).status).toBe(403);
   });
 
   it("shows locked state without a lock button once locked", async () => {
@@ -57,7 +57,7 @@ describe("Lock Session", () => {
 
   it("rejects locking with the invite link token", async () => {
     const s = await createSession(env.DB, 2);
-    expect((await lock(s.invite_link_token)).status).toBe(404);
+    expect((await lock(s.invite_link_token)).status).toBe(403);
     expect(await lockedAt(s.id)).toBeNull();
   });
 

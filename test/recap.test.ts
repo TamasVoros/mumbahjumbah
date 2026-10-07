@@ -85,7 +85,7 @@ describe("recap routes", () => {
     const s = await createSession(env.DB, 1);
     expect((await SELF.fetch(`https://example.com/i/${s.invite_link_token}/recap.png`)).status).toBe(409);
     await lock(s.organizer_link_token);
-    expect((await SELF.fetch(`https://example.com/o/${s.invite_link_token}/recap.png`)).status).toBe(404);
+    expect((await SELF.fetch(`https://example.com/o/${s.invite_link_token}/recap.png`)).status).toBe(403);
     const lb = await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}/leaderboard`)).text();
     expect(lb).toContain(`/i/${s.invite_link_token}/recap.png`);
     const lbo = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/leaderboard`)).text();
