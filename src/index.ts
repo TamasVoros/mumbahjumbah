@@ -15,6 +15,7 @@ import {
   findByInviteToken,
   findByOrganizerToken,
   lockSession,
+  MAX_PICK_COUNT,
   parsePickCount,
   type Session,
 } from "./sessions";
@@ -105,6 +106,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 form:has(#pick-custom:checked) #custom-pick { display: flex; }
 .field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700; }
 .field input { font: 400 15px Archivo, system-ui, sans-serif; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 2px; padding: 13px 14px; min-height: 52px; width: 100%; color: var(--ink); }
+.field .hint { font-weight: 400; }
 .field input::placeholder { color: var(--placeholder); }
 .field input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring); }
 .zig { height: 16px; background: ${ZIGZAG} repeat-x; margin: 0 -20px 8px; }
@@ -217,7 +219,6 @@ const createForm = (error?: string) =>
                 <h1>Predict the jargon. Win the meeting.</h1>
                 <p>Guess the buzzwords before the call. Get scored against the transcript after.</p>
                 <div class="hero-actions">
-                  <a class="btn btn-red" href="#new">Create a session</a>
                   <a class="btn btn-bone" href="#how">See how it works</a>
                 </div>
               </div>
@@ -226,17 +227,17 @@ const createForm = (error?: string) =>
                   <h2>New session</h2>
                   ${error ? html`<p class="error" role="alert">${error}</p>` : ""}
                   <fieldset class="pills">
-                    <legend>Pick Count</legend>
+                    <legend>Set your buzzword limit!</legend>
                     <div class="row">
                       <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
                       ${PICK_PRESETS.map(
                         (n) => html`<label><input type="radio" name="pick_preset" value="${n}" /><span>${n}</span></label>`,
                       )}
                     </div>
-                    <p class="hint">Each player submits exactly this many words or phrases.</p>
                   </fieldset>
-                  <label class="field" id="custom-pick">Any positive whole number, e.g. 9 or 25
-                    <input type="number" name="pick_count" min="1" step="1" value="9" inputmode="numeric" />
+                  <label class="field" id="custom-pick">
+                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Buzzword limit" />
+                    <span class="hint">Choose between 1 and ${MAX_PICK_COUNT}.</span>
                   </label>
                   <div>
                     <div class="zig" aria-hidden="true"></div>
