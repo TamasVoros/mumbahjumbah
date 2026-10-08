@@ -19,11 +19,11 @@ describe("pick count cap", () => {
 describe("field limits", () => {
   const ok = { email: "a@x.com", display_name: "Ann", pick: ["one"] };
   it("rejects over-long email, name, and picks", () => {
-    expect(validateGrid({ ...ok, email: "a".repeat(250) + "@x.com" }, 1).ok).toBe(false);
+    expect(validateGrid({ ...ok, email: "a".repeat(125) + "@x.com" }, 1).ok).toBe(false);
     expect(validateGrid({ ...ok, display_name: "n".repeat(51) }, 1).ok).toBe(false);
-    expect(validateGrid({ ...ok, pick: ["p".repeat(61)] }, 1).ok).toBe(false);
-    expect(validateGrid({ ...ok, pick: ["a b c d e f g h i"] }, 1).ok).toBe(false);
-    expect(validateGrid({ ...ok, pick: ["a b c d e f g h"] }, 1).ok).toBe(true);
+    expect(validateGrid({ ...ok, pick: ["p".repeat(101)] }, 1).ok).toBe(false);
+    expect(validateGrid({ ...ok, pick: ["a b c d e f g h i j k l m"] }, 1).ok).toBe(false);
+    expect(validateGrid({ ...ok, pick: ["a b c d e f g h i j k l"] }, 1).ok).toBe(true);
   });
 });
 

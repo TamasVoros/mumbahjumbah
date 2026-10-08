@@ -13,9 +13,11 @@ Tracked in issue #30 (code-review security audit).
 
 ## Limits (enforced in code)
 
-Pick count 1-100 (also a DB trigger, migration 0005); email 254; display name 50; pick 60 chars / 8 words; transcript 5 MB.
+Pick count 1-100 (also a DB trigger, migration 0005); email 128; display name 50; pick 100 chars / 12 words; transcript 5 MB.
+
+- **`workers_dev` is disabled on prod** (custom domain only); the dev Worker stays on workers.dev, so keep real data out of dev.
 
 ## Open / needs Cloudflare config or policy
 
 Rate limiting (WAF rule or Rate Limiting binding, Turnstile on session creation), PII retention/deletion policy and
-Privacy/Terms pages, disabling `workers_dev` on prod once a custom domain exists, tracking the `fflate` advisory via `satori`.
+Privacy/Terms pages, tracking the `fflate` advisory via `satori`.

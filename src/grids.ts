@@ -11,10 +11,10 @@ export type GridInput = { email: string; displayName: string; picks: string[] };
 
 export type GridResult = { ok: true; value: GridInput } | { ok: false; error: string };
 
-export const MAX_EMAIL_LENGTH = 254;
+export const MAX_EMAIL_LENGTH = 128;
 export const MAX_DISPLAY_NAME_LENGTH = 50;
-export const MAX_PICK_LENGTH = 60;
-export const MAX_PICK_WORDS = 8;
+export const MAX_PICK_LENGTH = 100;
+export const MAX_PICK_WORDS = 12;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
