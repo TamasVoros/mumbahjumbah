@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { html, raw } from "hono/html";
+import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
 import { saveGrid, validateGrid } from "./grids";
 import { entryView, lockedView, submittedView } from "./player-ui";
@@ -14,6 +15,7 @@ import {
   findByInviteToken,
   findByOrganizerToken,
   lockSession,
+  MAX_PICK_COUNT,
   parsePickCount,
   type Session,
 } from "./sessions";
@@ -21,6 +23,37 @@ import {
 export type Bindings = { DB: D1Database };
 
 export const app = new Hono<{ Bindings: Bindings }>();
+
+// Security headers on every response. Pages use inline <style>/<script> and Google Fonts, so script/style
+// keep 'unsafe-inline' for now (moving to nonces is a follow-up); everything else is locked down.
+app.use(
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'none'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+    referrerPolicy: "no-referrer",
+    xFrameOptions: "DENY",
+    xContentTypeOptions: "nosniff",
+  }),
+);
+
+// Capability URLs (organizer/invite tokens) and freshly minted links must never be cached.
+app.use("*", async (c, next) => {
+  await next();
+  const path = c.req.path;
+  if (path.startsWith("/o/") || path.startsWith("/i/") || (path === "/sessions" && c.req.method === "POST")) {
+    c.res.headers.set("Cache-Control", "no-store");
+  }
+});
 
 const ZIGZAG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 12L8 4L16 12' fill='none' stroke='%23D2432C' stroke-width='2.5'/%3E%3C/svg%3E\")";
@@ -73,6 +106,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 form:has(#pick-custom:checked) #custom-pick { display: flex; }
 .field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700; }
 .field input { font: 400 15px Archivo, system-ui, sans-serif; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 2px; padding: 13px 14px; min-height: 52px; width: 100%; color: var(--ink); }
+.field .hint { font-weight: 400; }
+#custom-pick input { width: calc((100% - 16px) / 3); min-height: 48px; padding: 0 14px; }
 .field input::placeholder { color: var(--placeholder); }
 .field input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring); }
 .zig { height: 16px; background: ${ZIGZAG} repeat-x; margin: 0 -20px 8px; }
@@ -110,6 +145,7 @@ form:has(#pick-custom:checked) #custom-pick { display: flex; }
   .zig { margin: 0 -36px 8px; }
   .field input { font-size: 16px; }
   .pills .row { gap: 10px; }
+  #custom-pick input { width: calc((100% - 20px) / 3); }
   .field input:focus { box-shadow: 0 0 0 4px var(--ring); }
   .pills input:focus-visible + span { box-shadow: 0 0 0 4px var(--ring), 0 0 0 6px var(--indigo); }
   .section { padding: 80px 0; display: grid; grid-template-columns: 1fr 2fr; gap: 64px; }
@@ -185,7 +221,6 @@ const createForm = (error?: string) =>
                 <h1>Predict the jargon. Win the meeting.</h1>
                 <p>Guess the buzzwords before the call. Get scored against the transcript after.</p>
                 <div class="hero-actions">
-                  <a class="btn btn-red" href="#new">Create a session</a>
                   <a class="btn btn-bone" href="#how">See how it works</a>
                 </div>
               </div>
@@ -194,17 +229,17 @@ const createForm = (error?: string) =>
                   <h2>New session</h2>
                   ${error ? html`<p class="error" role="alert">${error}</p>` : ""}
                   <fieldset class="pills">
-                    <legend>Pick Count</legend>
+                    <legend>Set your buzzword limit!</legend>
                     <div class="row">
                       <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
                       ${PICK_PRESETS.map(
                         (n) => html`<label><input type="radio" name="pick_preset" value="${n}" /><span>${n}</span></label>`,
                       )}
                     </div>
-                    <p class="hint">Each player submits exactly this many words or phrases.</p>
                   </fieldset>
-                  <label class="field" id="custom-pick">Any positive whole number, e.g. 9 or 25
-                    <input type="number" name="pick_count" min="1" step="1" value="9" inputmode="numeric" />
+                  <label class="field" id="custom-pick">
+                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Buzzword limit" />
+                    <span class="hint">Choose between 1 and ${MAX_PICK_COUNT}.</span>
                   </label>
                   <div>
                     <div class="zig" aria-hidden="true"></div>
@@ -276,7 +311,7 @@ app.post("/sessions", async (c) => {
     typeof preset === "string" && (PICK_PRESETS as readonly string[]).includes(preset) ? preset : form["pick_count"];
   const pickCount = parsePickCount(raw);
   if (pickCount === null) {
-    return c.html(createForm("Pick Count must be a positive whole number."), 400);
+    return c.html(createForm("Pick Count must be a whole number from 1 to 100."), 400);
   }
   const session = await createSession(c.env.DB, pickCount);
   const origin = new URL(c.req.url).origin;
@@ -371,7 +406,9 @@ app.post("/i/:token", async (c) => {
   }
   // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
   // Resubmitting under the same email is a deliberate edit/upsert, not an error.
-  await saveGrid(c.env.DB, session.id, result.value);
+  if (!(await saveGrid(c.env.DB, session.id, result.value))) {
+    return c.html(lockedView(session.id, session.invite_link_token), 403);
+  }
   return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks));
 });
 
