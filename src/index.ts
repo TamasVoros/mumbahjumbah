@@ -107,6 +107,7 @@ form:has(#pick-custom:checked) #custom-pick { display: flex; }
 .field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700; }
 .field input { font: 400 15px Archivo, system-ui, sans-serif; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 2px; padding: 13px 14px; min-height: 52px; width: 100%; color: var(--ink); }
 .field .hint { font-weight: 400; }
+#custom-pick input { width: calc((100% - 16px) / 3); min-height: 48px; padding: 0 14px; }
 .field input::placeholder { color: var(--placeholder); }
 .field input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring); }
 .zig { height: 16px; background: ${ZIGZAG} repeat-x; margin: 0 -20px 8px; }
@@ -144,6 +145,7 @@ form:has(#pick-custom:checked) #custom-pick { display: flex; }
   .zig { margin: 0 -36px 8px; }
   .field input { font-size: 16px; }
   .pills .row { gap: 10px; }
+  #custom-pick input { width: calc((100% - 20px) / 3); }
   .field input:focus { box-shadow: 0 0 0 4px var(--ring); }
   .pills input:focus-visible + span { box-shadow: 0 0 0 4px var(--ring), 0 0 0 6px var(--indigo); }
   .section { padding: 80px 0; display: grid; grid-template-columns: 1fr 2fr; gap: 64px; }
