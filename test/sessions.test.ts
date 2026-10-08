@@ -114,7 +114,7 @@ describe("Create Session", () => {
       expect(res.status).toBe(400);
       const body = await res.text();
       expect(body).toContain('role="alert"');
-      expect(body).toContain("Pick Count must be a positive whole number.");
+      expect(body).toContain("Pick Count must be a whole number from 1 to 100.");
       expect(body).toContain("New session");
     });
   });

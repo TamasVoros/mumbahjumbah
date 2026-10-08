@@ -18,11 +18,13 @@ export function generateToken(): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Parses a positive integer (no square-grid constraint). Returns null if invalid. */
+export const MAX_PICK_COUNT = 100;
+
+/** Parses a whole number from 1 to MAX_PICK_COUNT (no square-grid constraint). Returns null if invalid. */
 export function parsePickCount(raw: unknown): number | null {
   if (typeof raw !== "string" || !/^\d+$/.test(raw.trim())) return null;
   const n = Number(raw.trim());
-  return Number.isSafeInteger(n) && n > 0 ? n : null;
+  return n >= 1 && n <= MAX_PICK_COUNT ? n : null;
 }
 
 export async function createSession(

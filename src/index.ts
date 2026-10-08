@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { html, raw } from "hono/html";
+import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
 import { saveGrid, validateGrid } from "./grids";
 import { entryView, lockedView, submittedView } from "./player-ui";
@@ -21,6 +22,37 @@ import {
 export type Bindings = { DB: D1Database };
 
 export const app = new Hono<{ Bindings: Bindings }>();
+
+// Security headers on every response. Pages use inline <style>/<script> and Google Fonts, so script/style
+// keep 'unsafe-inline' for now (moving to nonces is a follow-up); everything else is locked down.
+app.use(
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'none'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+    referrerPolicy: "no-referrer",
+    xFrameOptions: "DENY",
+    xContentTypeOptions: "nosniff",
+  }),
+);
+
+// Capability URLs (organizer/invite tokens) and freshly minted links must never be cached.
+app.use("*", async (c, next) => {
+  await next();
+  const path = c.req.path;
+  if (path.startsWith("/o/") || path.startsWith("/i/") || (path === "/sessions" && c.req.method === "POST")) {
+    c.res.headers.set("Cache-Control", "no-store");
+  }
+});
 
 const ZIGZAG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 12L8 4L16 12' fill='none' stroke='%23D2432C' stroke-width='2.5'/%3E%3C/svg%3E\")";
@@ -276,7 +308,7 @@ app.post("/sessions", async (c) => {
     typeof preset === "string" && (PICK_PRESETS as readonly string[]).includes(preset) ? preset : form["pick_count"];
   const pickCount = parsePickCount(raw);
   if (pickCount === null) {
-    return c.html(createForm("Pick Count must be a positive whole number."), 400);
+    return c.html(createForm("Pick Count must be a whole number from 1 to 100."), 400);
   }
   const session = await createSession(c.env.DB, pickCount);
   const origin = new URL(c.req.url).origin;
@@ -371,7 +403,9 @@ app.post("/i/:token", async (c) => {
   }
   // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
   // Resubmitting under the same email is a deliberate edit/upsert, not an error.
-  await saveGrid(c.env.DB, session.id, result.value);
+  if (!(await saveGrid(c.env.DB, session.id, result.value))) {
+    return c.html(lockedView(session.id, session.invite_link_token), 403);
+  }
   return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks));
 });
 

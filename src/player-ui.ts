@@ -174,14 +174,14 @@ export const entryView = (sessionId: number, pickCount: number, v: FormValues = 
       ${error ? html`<p class="alert" role="alert">${error}</p>` : ""}
       <form method="post">
         <div class="fields">
-          <input type="email" name="email" value="${v.email ?? ""}" placeholder="Email (e.g. sam@acme.co)" aria-label="Email" autocomplete="email" required />
-          <input type="text" name="display_name" value="${v.display_name ?? ""}" placeholder="Display name (e.g. Sam)" aria-label="Display name" autocomplete="nickname" required />
+          <input type="email" name="email" maxlength="254" value="${v.email ?? ""}" placeholder="Email (e.g. sam@acme.co)" aria-label="Email" autocomplete="email" required />
+          <input type="text" name="display_name" maxlength="50" value="${v.display_name ?? ""}" placeholder="Display name (e.g. Sam)" aria-label="Display name" autocomplete="nickname" required />
         </div>
         <noscript>
           <ol>
             ${Array.from(
               { length: pickCount },
-              (_, i) => html`<li><input type="text" name="pick" value="${picks[i] ?? ""}" aria-label="Pick ${i + 1}" required /></li>`,
+              (_, i) => html`<li><input type="text" name="pick" maxlength="60" value="${picks[i] ?? ""}" aria-label="Pick ${i + 1}" required /></li>`,
             )}
           </ol>
           <button class="btn cta" type="submit">Submit grid</button>
