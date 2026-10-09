@@ -102,8 +102,6 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 .pills span { display: block; text-align: center; min-height: 48px; line-height: 45px; padding: 0 8px; border: 1.5px solid var(--ink); border-radius: 2px; background: var(--paper); font-weight: 700; }
 .pills input:checked + span { background: var(--indigo); border-color: var(--indigo); color: #fff; }
 .pills input:focus-visible + span { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring), 0 0 0 5px var(--indigo); }
-#custom-pick { display: none; }
-form:has(#pick-custom:checked) #custom-pick { display: flex; }
 .field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700; }
 .field input { font: 400 15px Archivo, system-ui, sans-serif; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 2px; padding: 13px 14px; min-height: 52px; width: 100%; color: var(--ink); }
 .field .hint { font-weight: 400; }
@@ -205,7 +203,7 @@ app.get("/health", async (c) => {
 
 const PICK_PRESETS = ["5", "10"] as const;
 
-// Pills are radio inputs, so the form works without JS; :has() reveals the custom field only for Custom.
+// Pills are radio inputs, so the form works without JS.
 const createForm = (error?: string) =>
   page(
     "MumbahJumbah: Predict the jargon. Win the meeting.",
@@ -281,18 +279,19 @@ const createForm = (error?: string) =>
       </main>
       <footer class="wrap"><div class="container foot"><span>© MumbahJumbah</span><span><a href="/plans">See plans</a> · Privacy · Terms</span></div></footer>
       <script>
-        // Only the Custom number input takes part in validation and submission; for 5/10 it is disabled,
-        // so a stale invalid value in the hidden field can never block a preset submit.
+        // The number input is always visible: picking 5 or 10 fills it in, typing in it switches back to Custom.
+        // Without JS the checked preset wins on the server, so the form still works.
         (function () {
           var form = document.querySelector('form[action="/sessions"]');
           var input = form.querySelector('input[name="pick_count"]');
-          function sync() {
-            var custom = form.querySelector("#pick-custom").checked;
-            input.disabled = !custom;
-            input.required = custom;
-          }
-          form.addEventListener("change", sync);
-          sync();
+          var custom = form.querySelector("#pick-custom");
+          form.addEventListener("change", function (e) {
+            var t = e.target;
+            if (t && t.name === "pick_preset" && t.value !== "custom") input.value = t.value;
+          });
+          input.addEventListener("input", function () {
+            custom.checked = true;
+          });
         })();
       </script>`,
     true,

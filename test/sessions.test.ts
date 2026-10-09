@@ -35,33 +35,37 @@ describe("Create Session", () => {
     expect(pills.slice(1).some((p) => p.includes("checked"))).toBe(false);
   });
 
-  it("inline script disables the number input unless Custom is selected, and requires it for Custom", async () => {
+  it("inline script fills the number input for 5/10 and switches to Custom when typing", async () => {
     const body = await (await SELF.fetch("https://example.com/")).text();
     const script = /<script>([\s\S]*?)<\/script>/.exec(body)![1]!;
-    const input = { disabled: false, required: false };
+    const input = { value: "7" };
     const custom = { checked: true };
-    let onChange = () => {};
+    let onChange: (e: unknown) => void = () => {};
+    let onInput: () => void = () => {};
     const form = {
       querySelector: (sel: string) => (sel.includes("pick_count") ? input : custom),
-      addEventListener: (_: string, fn: () => void) => (onChange = fn),
+      addEventListener: (_: string, fn: (e: unknown) => void) => (onChange = fn),
     };
+    (input as Record<string, unknown>).addEventListener = (_: string, fn: () => void) => (onInput = fn);
     new Function("document", script)({ querySelector: () => form });
-    // Custom selected on load: input live and required.
-    expect(input).toEqual({ disabled: false, required: true });
-    // Switching to 5/10: input disabled, so it cannot block submission or be sent.
+    // Picking 5 or 10 fills the number input.
+    onChange({ target: { name: "pick_preset", value: "5" } });
+    expect(input.value).toBe("5");
+    onChange({ target: { name: "pick_preset", value: "10" } });
+    expect(input.value).toBe("10");
+    // Picking Custom leaves the value alone.
+    onChange({ target: { name: "pick_preset", value: "custom" } });
+    expect(input.value).toBe("10");
+    // Typing selects Custom.
     custom.checked = false;
-    onChange();
-    expect(input).toEqual({ disabled: true, required: false });
-    // Back to Custom.
-    custom.checked = true;
-    onChange();
-    expect(input).toEqual({ disabled: false, required: true });
+    onInput();
+    expect(custom.checked).toBe(true);
   });
 
-  it("hides the number input via CSS unless Custom is checked", async () => {
+  it("keeps the number input visible for every preset", async () => {
     const body = await (await SELF.fetch("https://example.com/")).text();
-    expect(body).toContain("#custom-pick { display: none; }");
-    expect(body).toContain("form:has(#pick-custom:checked) #custom-pick { display: flex; }");
+    expect(body).not.toContain("#custom-pick { display: none; }");
+    expect(body).not.toMatch(/name="pick_count"[^>]*disabled/);
   });
 
   describe("landing page design (DESIGN.md 2A)", () => {
