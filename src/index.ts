@@ -507,7 +507,7 @@ app.post("/o/:token/name", async (c) => {
   }
   const session = await renameSession(c.env.DB, token, name);
   if (!session) return c.html(await organizerView(c.env.DB, existing, token, origin), 409);
-  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: "Name saved. Your invite link is ready." }));
+  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: "Name saved. Invite link ready." }));
 });
 
 // Only an Organizer Link token can start the pick timer: needs a name, 30-60 s (default 30), and it is fixed once started.
