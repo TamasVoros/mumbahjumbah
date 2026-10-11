@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession as createNamed } from "./helpers";
+import { createSession as createNamed, createWaitingSession } from "./helpers";
 import { createSession } from "../src/sessions";
 
 const postName = (token: string, name: string) =>
@@ -27,8 +27,45 @@ describe("Session Name gates the Invite Link", () => {
     expect(res.status).toBe(200);
     const after = await res.text();
     expect(after).toContain(`/i/${s.invite_link_token}`);
-    expect(after).toContain("<h1>Q3 all-hands</h1>");
+    expect(after).toContain('value="Q3 all-hands"');
+    expect(after).toContain('role="status"');
+    expect(after).toContain("Name saved. Invite link ready.");
     expect(await nameOf(s.id)).toBe("Q3 all-hands");
+  });
+
+  it("renders the name as an inline title input, with no name card, button or Session <id> fallback", async () => {
+    const s = await createSession(env.DB, 3);
+    const body = await getOrganizer(s.organizer_link_token);
+    expect(body).toMatch(/<h1><input class="title-input" name="name" type="text" maxlength="80" required/);
+    expect(body).toContain('placeholder="Name your session"');
+    expect(body).toContain('value=""');
+    expect(body).not.toContain(`Session ${s.id}`);
+    expect(body).not.toContain("Save name");
+    expect(body).not.toContain('id="session-name"');
+    expect(body).not.toContain('class="toast"');
+    expect(body).toContain("requestSubmit");
+  });
+
+  it("shows the title as a plain h1 once the timer starts or the Session is locked", async () => {
+    const s = await createWaitingSession(env.DB, 2, "Plain title");
+    expect(await getOrganizer(s.organizer_link_token)).toContain('value="Plain title"');
+    await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/timer`, { method: "POST" });
+    const picking = await getOrganizer(s.organizer_link_token);
+    expect(picking).toContain("<h1>Plain title</h1>");
+    expect(picking).not.toContain('class="title-input"');
+    await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/lock`, { method: "POST" });
+    const locked = await getOrganizer(s.organizer_link_token);
+    expect(locked).toContain("<h1>Plain title</h1>");
+    expect(locked).not.toContain('class="title-input"');
+  });
+
+  it("shows an alert toast on an invalid name and escapes the name in the input", async () => {
+    const s = await createSession(env.DB, 3);
+    const res = await postName(s.organizer_link_token, "x".repeat(81));
+    expect(res.status).toBe(400);
+    expect(await res.text()).toMatch(/<p class="toast" role="alert">Session name must be 1 to 80 characters\./);
+    const named = await (await postName(s.organizer_link_token, '"><script>x</script>')).text();
+    expect(named).not.toContain("<script>x</script>");
   });
 
   it("rejects empty, whitespace-only and over-80-char names without saving", async () => {

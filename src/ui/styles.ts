@@ -131,6 +131,16 @@ textarea.field{height:96px;resize:vertical}
 .words--scroll{max-height:410px}
 .word .by{white-space:nowrap}.word .t{min-width:0;overflow-wrap:anywhere}
 .lnk{color:var(--indigo);font-weight:600}.lnk:hover{color:#8F2B22}
+.screen{position:relative}
+.titlebar__form{flex:1;min-width:0;margin:0}
+.title-input{display:block;width:100%;font:inherit;letter-spacing:inherit;color:var(--ink);background:transparent;border:0;border-bottom:1.5px dashed var(--ink);border-radius:0;padding:2px 0;text-overflow:ellipsis}
+.title-input::placeholder{color:var(--ph)}
+.title-input:focus{border-bottom:1.5px solid var(--indigo);box-shadow:0 3px 0 rgba(31,47,99,.12);outline:none}
+.toast{position:absolute;top:0;left:0;right:0;z-index:10;margin:0;border:var(--b);border-radius:2px;background:var(--paper);padding:10px 14px;font-size:14px;pointer-events:none;animation:toast-fade 6s ease-out forwards}
+.toast[role=alert]{border-color:var(--red);border-left-width:6px}
+.toast[role=status]{border-left:6px solid var(--indigo)}
+@keyframes toast-fade{0%,66%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-6px);visibility:hidden}}
+@media(prefers-reduced-motion:reduce){.toast{animation-name:toast-fade-rm}@keyframes toast-fade-rm{0%,66%{opacity:1}100%{opacity:0;visibility:hidden}}}
 .msg{border:var(--b);border-radius:2px;background:var(--paper);padding:10px 14px;font-size:14px}
 .msg[role=alert]{border-color:var(--red);border-left-width:6px}
 .msg[role=status]{border-left:6px solid var(--indigo)}

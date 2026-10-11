@@ -26,6 +26,8 @@ var sync=function(){var n=file.files&&file.files.length?file.files[0].name:'';na
 ['dragleave','drop'].forEach(function(t){dz.addEventListener(t,function(){dz.classList.remove('is-over')})});
 dz.addEventListener('drop',function(e){e.preventDefault();if(e.dataTransfer&&e.dataTransfer.files.length){file.files=e.dataTransfer.files;sync()}});
 file.addEventListener('change',sync);text.addEventListener('input',sync);sync()}
+var nf=document.querySelector('[data-name-form]');if(nf){var ni=nf.elements.name,nv=ni.value;
+ni.addEventListener('blur',function(){var v=ni.value.trim();if(v&&v!==nv.trim()){nv=ni.value;nf.requestSubmit?nf.requestSubmit():nf.submit()}})}
 [].forEach.call(document.querySelectorAll('[data-copy]'),function(b){if(!navigator.clipboard)return;b.hidden=false;b.addEventListener('click',function(){navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied'})})})})();`;
 
 // Organizer countdown (server-time offset); reloads at zero so the page shows the locked state the server now holds.
@@ -50,9 +52,12 @@ export const organizerView = async (
   ]);
   const invite = `${origin}/i/${session.invite_link_token}`;
 
-  const messages = html`${message?.error ? html`<p class="msg" role="alert">${message.error}</p>` : ""}${message?.ok
-    ? html`<p class="msg" role="status">${message.ok}</p>`
-    : ""}`;
+  // Toast: CSS-only fade (no JS), non-blocking, sits directly below the navbar.
+  const messages = message?.error
+    ? html`<p class="toast" role="alert">${message.error}</p>`
+    : message?.ok
+      ? html`<p class="toast" role="status">${message.ok}</p>`
+      : "";
 
   const panel = dashboardPanel(
     dash,
@@ -78,20 +83,18 @@ export const organizerView = async (
         </section>`;
 
   const named = session.name !== null;
-  const nameForm = html`<form class="stack" method="post" action="/o/${token}/name">
-    <label class="label" for="session-name">Session name</label>
-    <input class="field" id="session-name" name="name" type="text" maxlength="80" required
-      value="${session.name ?? ""}" placeholder="e.g. Q3 all-hands" autocomplete="off" />
-    <p class="small muted">${named
-      ? "Participants see this name. You can change it until you lock the Session."
-      : "Name the Session to get your invite link. Participants see this name."}</p>
-    <button class="btn btn--secondary" type="submit">${named ? "Save name" : "Save name and get invite link"}</button>
-  </form>`;
 
   const now = Date.now();
   const state = sessionState(session, now);
   const stateChip = { setup: chip("pending", "SETUP"), open: chip("open"), picking: chip("pending", "PICKING"), locked: chip("locked") }[state];
-  const header = html`<div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${stateChip}</div>`;
+  // Editable while neither picking nor locked: the title is the name field (Enter, or blur with JS, saves).
+  const editable = state === "setup" || state === "open";
+  const header = editable
+    ? html`<div class="titlebar"><form class="titlebar__form" method="post" action="/o/${token}/name" data-name-form>
+        <h1><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
+          aria-label="Session name" placeholder="Name your session" value="${session.name ?? ""}" /></h1>
+      </form>${stateChip}</div>`
+    : html`<div class="titlebar"><h1>${session.name ?? ""}</h1>${stateChip}</div>`;
 
   // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
   const timerCard =
@@ -117,7 +120,6 @@ export const organizerView = async (
         <div class="cols">
           <div class="stack">${panel}</div>
           <div class="stack">
-            ${state === "picking" ? "" : nameForm}
             ${named
               ? html`${timerCard}
                   <div class="cta-card">
