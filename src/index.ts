@@ -229,7 +229,7 @@ const createForm = (error?: string) =>
                   <h2>New session</h2>
                   ${error ? html`<p class="error" role="alert">${error}</p>` : ""}
                   <fieldset class="pills">
-                    <legend>Set your buzzword limit!</legend>
+                    <legend>Maximum picks</legend>
                     <div class="row">
                       <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
                       ${PICK_PRESETS.map(
@@ -238,7 +238,7 @@ const createForm = (error?: string) =>
                     </div>
                   </fieldset>
                   <label class="field" id="custom-pick">
-                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Buzzword limit" />
+                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Maximum picks" />
                     <span class="hint">Choose between 1 and ${MAX_PICK_COUNT}.</span>
                   </label>
                   <div>
@@ -259,7 +259,7 @@ const createForm = (error?: string) =>
               <h2>Three steps. One of them is a meeting.</h2>
             </div>
             <div class="steps">
-              <div class="step"><span class="n">1</span><div><h3>Create a session</h3><p>Pick how many words each player gets. Share the invite link.</p></div></div>
+              <div class="step"><span class="n">1</span><div><h3>Create a session</h3><p>Set the most words each player can pick. Share the invite link.</p></div></div>
               <div class="step"><span class="n">2</span><div><h3>Everyone predicts</h3><p>Each player locks in their jargon picks before the call.</p></div></div>
               <div class="step"><span class="n">3</span><div><h3>Meeting, then scores</h3><p>Upload the transcript after. The leaderboard writes itself.</p></div></div>
             </div>

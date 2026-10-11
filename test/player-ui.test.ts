@@ -34,7 +34,7 @@ describe("invite-link screens follow DESIGN.md", () => {
 
   it("entry: validation error re-renders with prior picks escaped", async () => {
     const s = await createSession(env.DB, 3);
-    const res = await post(s.invite_link_token, ["<b>x</b>", "y"]);
+    const res = await post(s.invite_link_token, ["<b>x</b>", "y", "y"]);
     expect(res.status).toBe(400);
     const html = await res.text();
     expect(html).toContain('role="alert"');

@@ -147,8 +147,8 @@ function render(){
  if(side)side.textContent=picks.length+' of '+n+' picked';
  fill.style.width=(picks.length/n*100)+'%';
  fill.parentNode.setAttribute('aria-valuenow',picks.length);
- submit.disabled=left>0;
- submit.textContent=left>0?'Submit grid \\u00b7 '+left+' to go':'Submit grid';
+ submit.disabled=picks.length<1;
+ submit.textContent=picks.length<1?'Add at least 1 pick':'Submit grid';
  entry.hidden=left<=0;full.hidden=left>0;
 }
 function addPick(){
@@ -178,7 +178,7 @@ export const entryView = (
     sessionLabel(sessionId, name),
     "open",
     html`${titleRow(sessionId, "open", name)}
-      <p class="sub">Predict ${pickCount} ${words} you expect to hear in the meeting. Type one, press Enter, repeat. Each must be different.</p>
+      <p class="sub">Predict up to ${pickCount} ${words} you expect to hear in the meeting. Type one, press Enter, repeat. Each must be different.</p>
       ${error ? html`<p class="alert" role="alert">${error}</p>` : ""}
       <form method="post">
         <div class="fields">
@@ -189,7 +189,7 @@ export const entryView = (
           <ol>
             ${Array.from(
               { length: pickCount },
-              (_, i) => html`<li><input type="text" name="pick" maxlength="100" value="${picks[i] ?? ""}" aria-label="Pick ${i + 1}" required /></li>`,
+              (_, i) => html`<li><input type="text" name="pick" maxlength="100" value="${picks[i] ?? ""}" aria-label="Pick ${i + 1}"${i === 0 ? " required" : ""} /></li>`,
             )}
           </ol>
           <button class="btn cta" type="submit">Submit grid</button>
@@ -201,7 +201,7 @@ export const entryView = (
               <kbd aria-hidden="true">ENTER ↵</kbd>
               <button id="pickadd" class="btn add" type="button">Add</button>
             </div>
-            <div id="full" class="full" hidden>All ${pickCount} picked. Remove one to swap it.</div>
+            <div id="full" class="full" hidden>Maximum of ${pickCount} reached. Remove one to swap it.</div>
             <p id="msg" class="msg" role="status" aria-live="polite"></p>
             <div class="picks">
               <div id="count" class="label">YOUR PICKS · ${picks.length} / ${pickCount}</div>

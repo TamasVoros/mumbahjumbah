@@ -18,7 +18,7 @@ export const MAX_PICK_WORDS = 12;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Validates a raw submission against a Session's Pick Count. Duplicates are rejected, never deduped. */
+/** Validates a raw submission against a Session's Pick Count (a maximum: 1..pickCount picks). Duplicates are rejected, never deduped. */
 export function validateGrid(
   raw: { email?: unknown; display_name?: unknown; pick?: unknown },
   pickCount: number,
@@ -37,10 +37,10 @@ export function validateGrid(
   );
   const picks = rawPicks.map(normalizePick).filter((p) => p !== "");
 
-  if (picks.length !== pickCount) {
+  if (picks.length < 1 || picks.length > pickCount) {
     return {
       ok: false,
-      error: `Submit exactly ${pickCount} picks (you submitted ${picks.length}).`,
+      error: `Submit between 1 and ${pickCount} ${pickCount === 1 ? "pick" : "picks"} (you submitted ${picks.length}).`,
     };
   }
   for (const p of picks) {

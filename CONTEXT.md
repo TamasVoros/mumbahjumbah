@@ -41,11 +41,11 @@ A cosmetic, freely-editable label a Participant sets per Session for the leaderb
 _Avoid_: Name, username
 
 **Grid**:
-A Participant's set of exactly Pick Count distinct Picks for a Session. Purely a flat set — no row/column/line scoring, no positional meaning. Rendered visually as tiles for the bingo feel, but the data model has no shape concept. One Grid per (Participant Email, Session) — resubmitting before lock upserts the existing Grid rather than creating a duplicate leaderboard row.
+A Participant's set of 1 up to Pick Count distinct Picks for a Session. Purely a flat set — no row/column/line scoring, no positional meaning. Rendered visually as tiles for the bingo feel, but the data model has no shape concept. One Grid per (Participant Email, Session) — resubmitting before lock upserts the existing Grid rather than creating a duplicate leaderboard row.
 _Avoid_: Card, board, picks (picks are the words themselves, the grid is the container)
 
 **Pick Count**:
-The number of Picks a Grid must contain for a given Session, set by the Organizer when creating the invite link (e.g. 9 or 25 as suggested presets — any positive integer is valid, not constrained to a perfect square). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
+The maximum number of Picks a Grid may contain for a given Session, set by the Organizer when creating the Session (labelled "Maximum picks"; any integer from 1 to 100 is valid, not constrained to a perfect square). A Grid holds between 1 and Pick Count Picks; Score is unchanged (sum of occurrence counts), so fewer Picks simply means fewer chances to score. See [ADR-0003](docs/adr/0003-pick-count-is-a-maximum.md). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
 _Avoid_: Grid size, dimensions (no x/y shape exists in the model)
 
 **Pick**:
@@ -80,7 +80,7 @@ _Avoid_: Custom branding, theming (White-Label is the canonical term — it's th
 
 - An **Operator** owns one or more **Sessions**; an **Organizer** belongs to exactly one **Operator** and creates **Sessions** on its behalf (v1: one Operator, who is also the sole Organizer)
 - Creating a **Session** generates exactly one **Invite Link** (for Participants) and exactly one **Organizer Link** (for the Organizer) — distinct capabilities, same Session
-- A **Session** has exactly one **Pick Count**, set by the Organizer; every **Grid** submitted for that **Session** must contain exactly that many **Picks**
+- A **Session** has exactly one **Pick Count**, set by the Organizer; every **Grid** submitted for that **Session** must contain between 1 and that many **Picks**
 - A **Participant** submits exactly one **Grid** (a set of **Picks**) per **Session**
 - A **Participant** is identified across **Sessions** by **Email**; **Display Name** is per-Session and cosmetic only
 - A **Session** has at most one uploaded **Transcript**, which produces exactly one **Jargon Result** and is then discarded

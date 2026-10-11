@@ -10,7 +10,7 @@ Reverse Bingo v1 on Cloudflare Workers + Hono + D1. See `CONTEXT.md` and `docs/a
 ## How to use it (end to end)
 
 1. Open the site and create a Session with a Pick Count (e.g. 9). Keep the Organizer Link private; send the Invite Link to your team.
-2. Each Participant opens the Invite Link before the meeting and submits email, display name and exactly Pick Count distinct predicted words/phrases (resubmit with the same email to change them).
+2. Each Participant opens the Invite Link before the meeting and submits email, display name and 1 up to Pick Count distinct predicted words/phrases (resubmit with the same email to change them).
 3. After the meeting, the Organizer opens the Organizer Link and clicks Lock Session (no more Grids).
 4. The Organizer uploads the meeting transcript (.txt or .vtt). It is read in memory and discarded; only counts for picked terms are kept.
 5. Everyone opens /i/token/leaderboard (or the Organizer /o/token/leaderboard) to see scores, and the Recap Card PNG link to download and post it in Slack.
