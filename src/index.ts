@@ -84,7 +84,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 .mono.accent { color: var(--raffia); }
 .wrap { padding-left: 24px; padding-right: 24px; }
 .container { max-width: 1120px; margin: 0 auto; }
-.hero { background: var(--indigo); color: var(--bone); padding-bottom: 32px; }
+.hero { display: flow-root; background: var(--indigo); color: var(--bone); padding-bottom: 32px; }
 .hero-grid { display: grid; gap: 28px; margin-top: 22px; }
 .hero-copy { display: flex; flex-direction: column; gap: 14px; }
 .hero h1 { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -.01em; }
