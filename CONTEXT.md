@@ -16,6 +16,10 @@ _Avoid_: Account, tenant, team (reserve for later multi-Operator/cross-Operator 
 The person who creates a Session, sets its Pick Count, and starts/locks it. Belongs to exactly one Operator. In v1, the sole Operator is also the only Organizer, so the two collapse into one person — kept as separate concepts so Approach B (an Operator with multiple staff each organizing sessions) doesn't require renaming anything later.
 _Avoid_: Host, admin, operator (Organizer is a per-Session role; Operator is the account)
 
+**Session Name**:
+A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked (when the timer arrives, until it starts). Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
+_Avoid_: Title, session title (Display Name is the Participant's, not this)
+
 **Invite Link**:
 The public, unauthenticated link shared with Participants to open a Session and submit a Grid. Grants no Organizer actions.
 _Avoid_: Session link, the link (ambiguous with Organizer Link)

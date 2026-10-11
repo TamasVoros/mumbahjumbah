@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession } from "../src/sessions";
+import { createSession } from "./helpers";
 
 async function newSession(pickCount: number) {
   return createSession(env.DB, pickCount);

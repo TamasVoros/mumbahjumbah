@@ -6,6 +6,7 @@ export type Session = {
   pick_count: number;
   organizer_link_token: string;
   invite_link_token: string;
+  name: string | null;
   locked_at: string | null;
   created_at: string;
 };
@@ -27,17 +28,36 @@ export function parsePickCount(raw: unknown): number | null {
   return n >= 1 && n <= MAX_PICK_COUNT ? n : null;
 }
 
+export const MAX_NAME_LENGTH = 80;
+
+/** Trims and validates a Session Name (1-80 chars after trimming). Returns null if invalid. */
+export function parseSessionName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.trim();
+  return name.length >= 1 && name.length <= MAX_NAME_LENGTH ? name : null;
+}
+
+/** Sets the Session Name via the Organizer token, only while unlocked. Null for an unknown token or a locked Session. */
+export function renameSession(db: D1Database, organizerToken: string, name: string) {
+  return db
+    .prepare("UPDATE sessions SET name = ? WHERE organizer_link_token = ? AND locked_at IS NULL RETURNING *")
+    .bind(name, organizerToken)
+    .first<Session>();
+}
+
+/** New sessions start without a name (Invite Link closed); `name` is for callers that already have one. */
 export async function createSession(
   db: D1Database,
   pickCount: number,
   operatorId: number = SEED_OPERATOR_ID,
+  name: string | null = null,
 ): Promise<Session> {
   const session = await db
     .prepare(
-      `INSERT INTO sessions (operator_id, pick_count, organizer_link_token, invite_link_token)
-       VALUES (?, ?, ?, ?) RETURNING *`,
+      `INSERT INTO sessions (operator_id, pick_count, organizer_link_token, invite_link_token, name)
+       VALUES (?, ?, ?, ?, ?) RETURNING *`,
     )
-    .bind(operatorId, pickCount, generateToken(), generateToken())
+    .bind(operatorId, pickCount, generateToken(), generateToken(), name)
     .first<Session>();
   if (!session) throw new Error("failed to create session");
   return session;

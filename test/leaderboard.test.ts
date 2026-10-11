@@ -1,7 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { getLeaderboard } from "../src/leaderboard";
-import { createSession } from "../src/sessions";
+import { createSession } from "./helpers";
 
 function submit(token: string, email: string, name: string, picks: string[]) {
   const body = new URLSearchParams();

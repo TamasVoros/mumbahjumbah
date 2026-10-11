@@ -49,7 +49,9 @@ export const organizerView = async (
 
   const peopleList =
     count === 0
-      ? html`<p class="small muted">No grids yet. Share the invite link and the list fills itself.</p>`
+      ? html`<p class="small muted">${session.name === null
+            ? "No grids yet. Name the Session to get an invite link to share."
+            : "No grids yet. Share the invite link and the list fills itself."}</p>`
       : html`<ul class="people ${count > VISIBLE_ROWS ? "people--scroll scroll" : ""}" aria-label="Participants">
             ${people.map((p) => html`<li class="person"><span class="nm">${p.display_name}</span>${chip("submitted")}</li>`)}
           </ul>
@@ -62,8 +64,19 @@ export const organizerView = async (
     <a class="mono" id="invite-link" href="${invite}">${invite}</a>
   </div>`;
 
+  const named = session.name !== null;
+  const nameForm = html`<form class="stack" method="post" action="/o/${token}/name">
+    <label class="label" for="session-name">Session name</label>
+    <input class="field" id="session-name" name="name" type="text" maxlength="80" required
+      value="${session.name ?? ""}" placeholder="e.g. Q3 all-hands" autocomplete="off" />
+    <p class="small muted">${named
+      ? "Participants see this name. You can change it until you lock the Session."
+      : "Name the Session to get your invite link. Participants see this name."}</p>
+    <button class="btn btn--secondary" type="submit">${named ? "Save name" : "Save name and get invite link"}</button>
+  </form>`;
+
   const header = html`<div class="topbar">${wordmark()}<span class="label">Organizer view</span></div>
-    <div class="titlebar"><h1>Organizer: Session ${session.id}</h1>${locked ? chip("locked") : chip("open")}</div>`;
+    <div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${locked ? chip("locked") : chip("open")}</div>`;
 
   if (!locked) {
     return shell(
@@ -75,15 +88,18 @@ export const organizerView = async (
             ${peopleList}
           </div>
           <div class="stack">
-            <div class="cta-card">
-              <form method="post" action="/o/${token}/lock">
-                <div class="pad pad--top"><h2>Ready to start?</h2>
-                  <p class="small muted">Locking can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
-                ${zigzag(true)}
-                <div class="pad"><button class="btn btn--primary" type="submit">Lock the grids</button></div>
-              </form>
-            </div>
-            ${inviteCard}
+            ${nameForm}
+            ${named
+              ? html`<div class="cta-card">
+                    <form method="post" action="/o/${token}/lock">
+                      <div class="pad pad--top"><h2>Ready to start?</h2>
+                        <p class="small muted">Locking can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
+                      ${zigzag(true)}
+                      <div class="pad"><button class="btn btn--primary" type="submit">Lock the grids</button></div>
+                    </form>
+                  </div>
+                  ${inviteCard}`
+              : ""}
           </div>
         </div>
         <script>${raw(PAGE_JS)}</script>`,

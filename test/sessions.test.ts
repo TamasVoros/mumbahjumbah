@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 async function create(pick: string) {
   return SELF.fetch("https://example.com/sessions", {
     method: "POST",
+    redirect: "manual",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ pick_count: pick }),
   });
@@ -12,15 +13,16 @@ async function create(pick: string) {
 async function createPreset(preset: string, pick: string) {
   return SELF.fetch("https://example.com/sessions", {
     method: "POST",
+    redirect: "manual",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ pick_preset: preset, pick_count: pick }),
   });
 }
 
-function links(body: string) {
-  const invite = /id="invite-link" href="([^"]+)"/.exec(body)![1]!;
-  const organizer = /id="organizer-link" href="([^"]+)"/.exec(body)![1]!;
-  return { invite, organizer };
+/** Creating a Session redirects straight to the Organizer page; returns that path's token. */
+function organizerToken(res: Response) {
+  expect(res.status).toBe(303);
+  return /^\/o\/([^/]+)$/.exec(res.headers.get("location")!)![1]!;
 }
 
 describe("Create Session", () => {
@@ -130,10 +132,8 @@ describe("Create Session", () => {
 
   it("submits a preset pill's count directly, ignoring the number input", async () => {
     for (const n of [5, 10]) {
-      const res = await createPreset(String(n), "abc");
-      expect(res.status).toBe(201);
-      const token = links(await res.text()).invite.split("/i/")[1]!;
-      const row = await env.DB.prepare("SELECT pick_count FROM sessions WHERE invite_link_token = ?")
+      const token = organizerToken(await createPreset(String(n), "abc"));
+      const row = await env.DB.prepare("SELECT pick_count FROM sessions WHERE organizer_link_token = ?")
         .bind(token)
         .first<{ pick_count: number }>();
       expect(row!.pick_count).toBe(n);
@@ -141,7 +141,7 @@ describe("Create Session", () => {
   });
 
   it("Custom preset validates the number input like before", async () => {
-    expect((await createPreset("custom", "13")).status).toBe(201);
+    expect((await createPreset("custom", "13")).status).toBe(303);
     for (const n of ["0", "-3", "2.5", "abc", ""]) {
       expect((await createPreset("custom", n)).status).toBe(400);
     }
@@ -151,45 +151,37 @@ describe("Create Session", () => {
     expect((await createPreset("9", "")).status).toBe(400);
   });
 
-  it("persists a session under the seed operator with distinct, resolving links", async () => {
+  it("persists an unnamed session under the seed operator and redirects to the organizer page", async () => {
     const res = await create("7");
-    expect(res.status).toBe(201);
-    const { invite, organizer } = links(await res.text());
-    const inviteToken = invite.split("/i/")[1]!;
-    const organizerToken = organizer.split("/o/")[1]!;
+    const token = organizerToken(res);
+    expect(res.headers.get("cache-control")).toBe("no-store");
 
-    const row = await env.DB.prepare("SELECT * FROM sessions WHERE invite_link_token = ?")
-      .bind(inviteToken)
+    const row = await env.DB.prepare("SELECT * FROM sessions WHERE organizer_link_token = ?")
+      .bind(token)
       .first<Record<string, unknown>>();
-    expect(row).toMatchObject({
-      operator_id: 1,
-      pick_count: 7,
-      organizer_link_token: organizerToken,
-      locked_at: null,
-    });
+    expect(row).toMatchObject({ operator_id: 1, pick_count: 7, name: null, locked_at: null });
     const op = await env.DB.prepare("SELECT id FROM operators WHERE id = ?").bind(row!.operator_id).first();
     expect(op).not.toBeNull();
 
     // Different token spaces: neither contains/derives from the other.
-    expect(inviteToken).not.toBe(organizerToken);
-    expect(organizerToken).not.toContain(inviteToken);
+    const inviteToken = row!.invite_link_token as string;
+    expect(inviteToken).not.toBe(token);
+    expect(token).not.toContain(inviteToken);
     expect(inviteToken.length).toBeGreaterThanOrEqual(43);
 
-    const inv = await SELF.fetch(invite);
-    const org = await SELF.fetch(organizer);
-    expect(inv.status).toBe(200);
+    // The redirect target is the organizer page itself: no intermediate "Session created" links page.
+    const org = await SELF.fetch(`https://example.com/o/${token}`);
     expect(org.status).toBe(200);
-    expect(await inv.text()).toContain(`Session ${row!.id}`);
-    expect(await org.text()).toContain(`Session ${row!.id}`);
+    expect(await org.text()).not.toContain("Session created");
 
     // Tokens are not interchangeable between routes.
     expect((await SELF.fetch(`https://example.com/o/${inviteToken}`)).status).toBe(403);
-    expect((await SELF.fetch(`https://example.com/i/${organizerToken}`)).status).toBe(404);
+    expect((await SELF.fetch(`https://example.com/i/${token}`)).status).toBe(404);
   });
 
   it("accepts any positive integer pick count", async () => {
     for (const n of ["1", "2", "10", "13", "100"]) {
-      expect((await create(n)).status).toBe(201);
+      expect((await create(n)).status).toBe(303);
     }
   });
 

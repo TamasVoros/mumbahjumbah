@@ -111,8 +111,10 @@ const shell = (title: string, status: "open" | "submitted" | "locked", main: unk
   </body>
 </html>`;
 
-const titleRow = (sessionId: number, status: "open" | "submitted" | "locked") =>
-  html`<div class="title-row"><h1>Session ${sessionId}</h1><span class="chip ${status}">${status}</span></div>`;
+const sessionLabel = (sessionId: number, name?: string | null) => name ?? `Session ${sessionId}`;
+
+const titleRow = (sessionId: number, status: "open" | "submitted" | "locked", name?: string | null) =>
+  html`<div class="title-row"><h1>${sessionLabel(sessionId, name)}</h1><span class="chip ${status}">${status}</span></div>`;
 
 // Progressive enhancement: with JS, a single field turns typed picks into pills and emits one hidden
 // `pick` input per pill; without JS the <noscript> block offers plain numbered inputs. The server
@@ -163,13 +165,19 @@ render();
 
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
 
-export const entryView = (sessionId: number, pickCount: number, v: FormValues = {}, error?: string) => {
+export const entryView = (
+  sessionId: number,
+  pickCount: number,
+  v: FormValues = {},
+  error?: string,
+  name?: string | null,
+) => {
   const picks = (v.picks ?? []).filter((p) => p.trim() !== "");
   const words = pickCount === 1 ? "word or phrase" : "words or phrases";
   return shell(
-    `Session ${sessionId}`,
+    sessionLabel(sessionId, name),
     "open",
-    html`${titleRow(sessionId, "open")}
+    html`${titleRow(sessionId, "open", name)}
       <p class="sub">Predict ${pickCount} ${words} you expect to hear in the meeting. Type one, press Enter, repeat. Each must be different.</p>
       ${error ? html`<p class="alert" role="alert">${error}</p>` : ""}
       <form method="post">
@@ -213,11 +221,11 @@ export const entryView = (sessionId: number, pickCount: number, v: FormValues = 
   );
 };
 
-export const submittedView = (sessionId: number, email: string, displayName: string, picks: string[]) =>
+export const submittedView = (sessionId: number, email: string, displayName: string, picks: string[], name?: string | null) =>
   shell(
     "Grid submitted",
     "submitted",
-    html`${titleRow(sessionId, "submitted")}
+    html`${titleRow(sessionId, "submitted", name)}
       <p class="sub">Thanks, ${displayName}. You’re in as <b>${email}</b>. ${picks.length} ${picks.length === 1 ? "pick" : "picks"}, on record.</p>
       <div class="full">All ${picks.length} picked.</div>
       <div class="picks">
@@ -230,12 +238,12 @@ export const submittedView = (sessionId: number, email: string, displayName: str
       </div>`,
   );
 
-export const lockedView = (sessionId: number, inviteToken: string) =>
+export const lockedView = (sessionId: number, inviteToken: string, name?: string | null) =>
   shell(
     "Session locked",
     "locked",
-    html`${titleRow(sessionId, "locked")}
-      <p class="sub">Session ${sessionId} is locked. The Organizer has locked this Session, so Grids can no longer be submitted or changed. Go sit through the meeting; we’ll score it afterwards.</p>
+    html`${titleRow(sessionId, "locked", name)}
+      <p class="sub">${sessionLabel(sessionId, name)} is locked. The Organizer has locked this Session, so Grids can no longer be submitted or changed. Go sit through the meeting; we’ll score it afterwards.</p>
       <div class="panel">
         <div class="label">WAITING FOR TRANSCRIPT</div>
         <h2>Results appear when the organizer scores it.</h2>

@@ -1,6 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession, lockSession } from "../src/sessions";
+import { lockSession } from "../src/sessions";
+import { createSession } from "./helpers";
 
 const url = (t: string) => `https://example.com/i/${t}`;
 

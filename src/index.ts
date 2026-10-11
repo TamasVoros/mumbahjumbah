@@ -17,6 +17,8 @@ import {
   lockSession,
   MAX_PICK_COUNT,
   parsePickCount,
+  parseSessionName,
+  renameSession,
   type Session,
 } from "./sessions";
 
@@ -314,19 +316,8 @@ app.post("/sessions", async (c) => {
     return c.html(createForm("Pick Count must be a whole number from 1 to 100."), 400);
   }
   const session = await createSession(c.env.DB, pickCount);
-  const origin = new URL(c.req.url).origin;
-  const invite = `${origin}/i/${session.invite_link_token}`;
-  const organizer = `${origin}/o/${session.organizer_link_token}`;
-  return c.html(
-    page(
-      "Session created",
-      html`<h1>Session created</h1>
-        <p>Pick Count: ${session.pick_count}</p>
-        <p>Invite Link (share with Participants): <a id="invite-link" href="${invite}">${invite}</a></p>
-        <p>Organizer Link (keep private): <a id="organizer-link" href="${organizer}">${organizer}</a></p>`,
-    ),
-    201,
-  );
+  // Straight to the Organizer page, where the Session Name is set and the Invite Link then appears.
+  return c.redirect(`/o/${session.organizer_link_token}`, 303);
 });
 
 const errorCss = `
@@ -382,17 +373,29 @@ const notFoundPage = () =>
     [{ href: "/", label: "Back to start" }],
   );
 
+// An Invite Link opened before the Organizer has saved a Session Name: a friendly 403, never a 404 or a pick form.
+const notOpenYetPage = () =>
+  uiShell(
+    "Not open yet",
+    errorCard("SOON", "This session isn’t open yet.", "The organizer hasn’t finished setting it up. Check back in a minute.", {
+      href: "",
+      label: "Try again",
+    }),
+  );
+
 app.get("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(notFoundPage(), 404);
-  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
-  return c.html(entryView(session.id, session.pick_count));
+  if (session.name === null) return c.html(notOpenYetPage(), 403);
+  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
+  return c.html(entryView(session.id, session.pick_count, {}, undefined, session.name));
 });
 
 app.post("/i/:token", async (c) => {
   const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(notFoundPage(), 404);
-  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
+  if (session.name === null) return c.html(notOpenYetPage(), 403);
+  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
   const raw = await c.req.parseBody({ all: true });
   const result = validateGrid(raw, session.pick_count);
   if (!result.ok) {
@@ -402,14 +405,14 @@ app.post("/i/:token", async (c) => {
       display_name: typeof raw["display_name"] === "string" ? raw["display_name"] : "",
       picks,
     };
-    return c.html(entryView(session.id, session.pick_count, values, result.error), 400);
+    return c.html(entryView(session.id, session.pick_count, values, result.error, session.name), 400);
   }
   // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
   // Resubmitting under the same email is a deliberate edit/upsert, not an error.
   if (!(await saveGrid(c.env.DB, session.id, result.value))) {
-    return c.html(lockedView(session.id, session.invite_link_token), 403);
+    return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
   }
-  return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks));
+  return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks, session.name));
 });
 
 const organizersOnlyPage = (inviteToken: string) =>
@@ -437,9 +440,38 @@ app.get("/o/:token", async (c) => {
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
 });
 
-// Only an Organizer Link token can lock; Invite Link tokens never match here.
+// Only an Organizer Link token can name the Session; editable until lock. Reveals the Invite Link once saved.
+app.post("/o/:token/name", async (c) => {
+  const token = c.req.param("token");
+  const existing = await findByOrganizerToken(c.env.DB, token);
+  if (!existing) return organizerMissing(c, token);
+  const origin = new URL(c.req.url).origin;
+  if (existing.locked_at) {
+    return c.html(await organizerView(c.env.DB, existing, token, origin, { error: "The Session is locked, so its name can’t change." }), 409);
+  }
+  const form = await c.req.parseBody();
+  const name = parseSessionName(form["name"]);
+  if (name === null) {
+    return c.html(
+      await organizerView(c.env.DB, existing, token, origin, { error: "Session name must be 1 to 80 characters." }),
+      400,
+    );
+  }
+  const session = await renameSession(c.env.DB, token, name);
+  if (!session) return c.html(await organizerView(c.env.DB, existing, token, origin), 409);
+  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: "Name saved. Your invite link is ready." }));
+});
+
+// Only an Organizer Link token can lock; Invite Link tokens never match here. A nameless Session can't lock.
 app.post("/o/:token/lock", async (c) => {
   const token = c.req.param("token");
+  const unnamed = await findByOrganizerToken(c.env.DB, token);
+  if (unnamed && unnamed.name === null) {
+    return c.html(
+      await organizerView(c.env.DB, unnamed, token, new URL(c.req.url).origin, { error: "Name the Session before locking it." }),
+      409,
+    );
+  }
   const session = await lockSession(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
@@ -559,8 +591,8 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
             </ul>`}
       </section>
       <section class="lb-board" aria-labelledby="lb-h">
-        <div class="mono">Session ${session.id}</div>
-        <h1 id="lb-h">Leaderboard: Session ${session.id}</h1>
+        <div class="mono">${session.name ?? `Session ${session.id}`}</div>
+        <h1 id="lb-h">Leaderboard: ${session.name ?? `Session ${session.id}`}</h1>
         ${board.length === 0
           ? html`<p>No Grids were submitted.</p>`
           : html`<table class="rows" role="table">
