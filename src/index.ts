@@ -4,7 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
 import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
-import { entryView, lockedView, submittedView } from "./player-ui";
+import { entryView, lockedView, submittedView, timesUpView, waitingView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
@@ -19,7 +19,13 @@ import {
   MAX_PICK_COUNT,
   parsePickCount,
   parseSessionName,
+  parseTimerSeconds,
   renameSession,
+  sessionState,
+  startTimer,
+  DEFAULT_TIMER_SECONDS,
+  MAX_TIMER_SECONDS,
+  MIN_TIMER_SECONDS,
   type Session,
 } from "./sessions";
 
@@ -375,34 +381,72 @@ const notOpenYetPage = () =>
     }),
   );
 
+const statusUrl = (s: Session) => `/i/${s.invite_link_token}/status`;
+
+// Only meaningful while the timer runs; `now` is the server clock the client derives its offset from.
+const timerInfo = (s: Session, now: number) => ({
+  endsAt: Date.parse(s.timer_ends_at ?? ""),
+  seconds: s.timer_seconds ?? 0,
+  now,
+  statusUrl: statusUrl(s),
+});
+
+const pickedWords = (raw: Record<string, unknown>) => [raw["pick"]].flat().filter((p): p is string => typeof p === "string");
+
+// Small JSON status for the participant pages (waiting screen and countdown). Never cached (see the /i/ rule above).
+app.get("/i/:token/status", async (c) => {
+  const now = Date.now();
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
+  if (!session) return c.json({ state: "unknown" }, 404);
+  const state = sessionState(session, now);
+  if (state === "setup") return c.json({ state }, 403);
+  return c.json({
+    state,
+    now,
+    endsAt: state === "picking" ? Date.parse(session.timer_ends_at ?? "") : null,
+    seconds: session.timer_seconds,
+  });
+});
+
 app.get("/i/:token", async (c) => {
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  const now = Date.now();
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
   if (!session) return c.html(notFoundPage(), 404);
-  if (session.name === null) return c.html(notOpenYetPage(), 403);
-  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
-  return c.html(entryView(session.id, session.pick_count, {}, undefined, session.name));
+  const state = sessionState(session, now);
+  if (state === "setup") return c.html(notOpenYetPage(), 403);
+  if (state === "locked") return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
+  if (state === "open") return c.html(waitingView(session.id, statusUrl(session), session.name));
+  return c.html(entryView(session.id, session.pick_count, {}, undefined, session.name, timerInfo(session, now)));
 });
 
 app.post("/i/:token", async (c) => {
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  const now = Date.now();
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
   if (!session) return c.html(notFoundPage(), 404);
-  if (session.name === null) return c.html(notOpenYetPage(), 403);
-  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
+  const state = sessionState(session, now);
+  if (state === "setup") return c.html(notOpenYetPage(), 403);
+  if (state === "open") {
+    return c.html(waitingView(session.id, statusUrl(session), session.name, "The organizer hasn’t started the timer yet, so nothing was saved."), 409);
+  }
   const raw = await c.req.parseBody({ all: true });
+  // Strict cutoff: after lock or timer end the submission is rejected before validation, and what was typed is shown back read-only.
+  if (state === "locked") {
+    return c.html(timesUpView(session.id, session.invite_link_token, pickedWords(raw), session.name), 409);
+  }
   const result = validateGrid(raw, session.pick_count);
   if (!result.ok) {
-    const picks = [raw["pick"]].flat().filter((p): p is string => typeof p === "string");
+    const picks = pickedWords(raw);
     const values = {
       email: typeof raw["email"] === "string" ? raw["email"] : "",
       display_name: typeof raw["display_name"] === "string" ? raw["display_name"] : "",
       picks,
     };
-    return c.html(entryView(session.id, session.pick_count, values, result.error, session.name), 400);
+    return c.html(entryView(session.id, session.pick_count, values, result.error, session.name, timerInfo(session, now)), 400);
   }
   // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
   // Resubmitting under the same email is a deliberate edit/upsert, not an error.
-  if (!(await saveGrid(c.env.DB, session.id, result.value))) {
-    return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
+  if (!(await saveGrid(c.env.DB, session.id, result.value, now))) {
+    return c.html(timesUpView(session.id, session.invite_link_token, result.value.picks, session.name), 409);
   }
   return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks, session.name));
 });
@@ -438,8 +482,9 @@ app.post("/o/:token/name", async (c) => {
   const existing = await findByOrganizerToken(c.env.DB, token);
   if (!existing) return organizerMissing(c, token);
   const origin = new URL(c.req.url).origin;
-  if (existing.locked_at) {
-    return c.html(await organizerView(c.env.DB, existing, token, origin, { error: "The Session is locked, so its name can’t change." }), 409);
+  if (existing.locked_at || existing.timer_started_at) {
+    const why = existing.locked_at ? "The Session is locked" : "The timer has started";
+    return c.html(await organizerView(c.env.DB, existing, token, origin, { error: `${why}, so its name can’t change.` }), 409);
   }
   const form = await c.req.parseBody();
   const name = parseSessionName(form["name"]);
@@ -452,6 +497,26 @@ app.post("/o/:token/name", async (c) => {
   const session = await renameSession(c.env.DB, token, name);
   if (!session) return c.html(await organizerView(c.env.DB, existing, token, origin), 409);
   return c.html(await organizerView(c.env.DB, session, token, origin, { ok: "Name saved. Your invite link is ready." }));
+});
+
+// Only an Organizer Link token can start the pick timer: needs a name, 30-60 s (default 30), and it is fixed once started.
+app.post("/o/:token/timer", async (c) => {
+  const token = c.req.param("token");
+  const now = Date.now();
+  const existing = await findByOrganizerToken(c.env.DB, token, now);
+  if (!existing) return organizerMissing(c, token);
+  const origin = new URL(c.req.url).origin;
+  const fail = async (error: string, status: 400 | 409) =>
+    c.html(await organizerView(c.env.DB, existing, token, origin, { error }), status);
+  if (existing.locked_at) return fail("The Session is locked, so the timer can’t start.", 409);
+  if (existing.timer_started_at) return fail("The timer has already started and can’t be changed.", 409);
+  if (existing.name === null) return fail("Name the Session before starting the timer.", 409);
+  const form = await c.req.parseBody();
+  const seconds = form["seconds"] === undefined ? DEFAULT_TIMER_SECONDS : parseTimerSeconds(form["seconds"]);
+  if (seconds === null) return fail(`Timer length must be a whole number from ${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds.`, 400);
+  const session = await startTimer(c.env.DB, token, seconds, now);
+  if (!session) return fail("The timer could not be started.", 409);
+  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: `Timer started: ${seconds} seconds.` }));
 });
 
 // Only an Organizer Link token can lock; Invite Link tokens never match here. A nameless Session can't lock.

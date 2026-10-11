@@ -1,6 +1,13 @@
 import { html, raw } from "hono/html";
 import { getJargonResult, getPickerCounts } from "./jargon";
-import { listParticipants, type Session } from "./sessions";
+import {
+  DEFAULT_TIMER_SECONDS,
+  listParticipants,
+  MAX_TIMER_SECONDS,
+  MIN_TIMER_SECONDS,
+  sessionState,
+  type Session,
+} from "./sessions";
 import { chip, shell, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
@@ -20,6 +27,13 @@ var sync=function(){var n=file.files&&file.files.length?file.files[0].name:'';na
 dz.addEventListener('drop',function(e){e.preventDefault();if(e.dataTransfer&&e.dataTransfer.files.length){file.files=e.dataTransfer.files;sync()}});
 file.addEventListener('change',sync);text.addEventListener('input',sync);sync()}
 [].forEach.call(document.querySelectorAll('[data-copy]'),function(b){if(!navigator.clipboard)return;b.hidden=false;b.addEventListener('click',function(){navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied'})})})})();`;
+
+// Organizer countdown (server-time offset); reloads at zero so the page shows the locked state the server now holds.
+const TIMER_JS = `(function(){var t=document.getElementById('org-timer');if(!t)return;
+var ends=+t.dataset.ends,total=+t.dataset.total*1000,off=+t.dataset.now-Date.now(),s=t.querySelector('[data-secs]'),f=t.querySelector('[data-fill]');
+function tick(){var l=ends-(Date.now()+off);if(l<=0){s.textContent='0';f.style.width='0';location.reload();return}
+s.textContent=Math.ceil(l/1000);f.style.width=Math.min(100,l/total*100)+'%';setTimeout(tick,250)}
+tick()})();`;
 
 export const organizerView = async (
   db: D1Database,
@@ -75,7 +89,27 @@ export const organizerView = async (
     <button class="btn btn--secondary" type="submit">${named ? "Save name" : "Save name and get invite link"}</button>
   </form>`;
 
-  const header = html`<div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${locked ? chip("locked") : chip("open")}</div>`;
+  const now = Date.now();
+  const state = sessionState(session, now);
+  const stateChip = { setup: chip("pending", "SETUP"), open: chip("open"), picking: chip("pending", "PICKING"), locked: chip("locked") }[state];
+  const header = html`<div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${stateChip}</div>`;
+
+  // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
+  const timerCard =
+    state === "picking"
+      ? html`<div class="stack" id="org-timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
+          <p class="label">Timer running</p>
+          <p style="font:400 36px/1 Anton,Impact,sans-serif"><span data-secs>${Math.max(0, Math.ceil((Date.parse(session.timer_ends_at ?? "") - now) / 1000))}</span> s</p>
+          <div class="progress"><i data-fill style="width:100%"></i></div>
+          <p class="small muted">Participants are picking. When it hits zero the Session locks by itself, or lock it sooner below.</p>
+        </div>`
+      : html`<form class="stack" method="post" action="/o/${token}/timer">
+          <label class="label" for="timer-seconds">Pick timer (seconds)</label>
+          <input class="field" id="timer-seconds" name="seconds" type="number" min="${MIN_TIMER_SECONDS}" max="${MAX_TIMER_SECONDS}" step="1"
+            value="${DEFAULT_TIMER_SECONDS}" required inputmode="numeric" />
+          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. Participants wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
+          <button class="btn btn--secondary" type="submit">Start timer</button>
+        </form>`;
 
   if (!locked) {
     return shell(
@@ -87,21 +121,23 @@ export const organizerView = async (
             ${peopleList}
           </div>
           <div class="stack">
-            ${nameForm}
+            ${state === "picking" ? "" : nameForm}
             ${named
-              ? html`<div class="cta-card">
+              ? html`${timerCard}
+                  <div class="cta-card">
                     <form method="post" action="/o/${token}/lock">
                       <div class="pad pad--top"><h2>Ready to start?</h2>
-                        <p class="small muted">Locking can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
+                        <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
                       ${zigzag(true)}
-                      <div class="pad"><button class="btn btn--primary" type="submit">Lock the grids</button></div>
+                      <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
                     </form>
                   </div>
                   ${inviteCard}`
               : ""}
           </div>
         </div>
-        <script>${raw(PAGE_JS)}</script>`,
+        <script>${raw(PAGE_JS)}</script>
+        ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
       { wide: true, organizer: true },
     );
   }

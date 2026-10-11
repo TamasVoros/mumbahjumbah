@@ -126,3 +126,30 @@ describe("pick-entry script", () => {
     expect(inner.querySelector('button[type="submit"]')).not.toBeNull();
   });
 });
+
+describe("countdown script", () => {
+  const withTimer = (endsInMs: number) => {
+    const now = Date.now();
+    const markup = String(
+      entryView(7, 3, { picks: [] }, undefined, "Standup", { endsAt: now + endsInMs, seconds: 30, now, statusUrl: "/i/t/status" }),
+    );
+    const dom = new JSDOM(markup, { runScripts: "dangerously" });
+    return { dom, doc: dom.window.document };
+  };
+
+  it("counts down from the server-time offset and keeps the form enabled while time is left", () => {
+    const { doc } = withTimer(20_000);
+    expect(doc.getElementById("timersecs")!.textContent).toMatch(/^(20|19) s$/);
+    expect(doc.getElementById("timerfill")!.style.width).toMatch(/^6\d(\.\d+)?%$/);
+    expect(doc.getElementById("timesup")!.hidden).toBe(true);
+    expect((doc.getElementById("pickfield") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("at zero disables the form, shows time's up, and leaves typed picks visible", () => {
+    const { doc } = withTimer(-1);
+    expect(doc.getElementById("timersecs")!.textContent).toBe("0 s");
+    expect(doc.getElementById("timesup")!.hidden).toBe(false);
+    expect((doc.getElementById("submit") as HTMLButtonElement).disabled).toBe(true);
+    expect((doc.getElementById("pickfield") as HTMLInputElement).disabled).toBe(true);
+  });
+});

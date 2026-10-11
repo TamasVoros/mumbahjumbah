@@ -54,15 +54,27 @@ describe("invite-link screens follow DESIGN.md", () => {
     expect(html).toContain("Edit your Grid");
   });
 
-  it("locked: waiting-for-transcript view, still 403", async () => {
+  it("locked: waiting-for-transcript view, 403 on GET", async () => {
     const s = await createSession(env.DB, 2);
     await lockSession(env.DB, s.organizer_link_token);
-    for (const res of [await SELF.fetch(url(s.invite_link_token)), await post(s.invite_link_token, ["a", "b"])]) {
-      expect(res.status).toBe(403);
-      const html = await res.text();
-      expect(html).toContain("WAITING FOR TRANSCRIPT");
-      expect(html).toContain("locked");
-      expect(html).toContain("/leaderboard");
-    }
+    const res = await SELF.fetch(url(s.invite_link_token));
+    expect(res.status).toBe(403);
+    const html = await res.text();
+    expect(html).toContain("WAITING FOR TRANSCRIPT");
+    expect(html).toContain("locked");
+    expect(html).toContain("/leaderboard");
+  });
+
+  it("late submit: 409 time's-up view that keeps the typed picks read-only", async () => {
+    const s = await createSession(env.DB, 2);
+    await lockSession(env.DB, s.organizer_link_token);
+    const res = await post(s.invite_link_token, ["alpha", "beta"]);
+    expect(res.status).toBe(409);
+    const html = await res.text();
+    expect(html).toContain("Time’s up");
+    expect(html).toContain("WAITING FOR TRANSCRIPT");
+    expect(html).toContain("alpha");
+    expect(html).toContain("beta");
+    expect(html).not.toContain('name="pick"');
   });
 });

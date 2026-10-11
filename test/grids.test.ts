@@ -122,7 +122,7 @@ describe("Submit Grid", () => {
     expect((await submit(s.invite_link_token, "a@b.co", ["x"], " ")).status).toBe(400);
     expect((await submit("nope", "a@b.co", ["x"])).status).toBe(404);
     await env.DB.prepare("UPDATE sessions SET locked_at = '2026-01-01' WHERE id = ?").bind(s.id).run();
-    expect((await submit(s.invite_link_token, "a@b.co", ["x"])).status).toBe(403);
+    expect((await submit(s.invite_link_token, "a@b.co", ["x"])).status).toBe(409);
   });
 
   it("escapes user input when re-rendering the form on error", async () => {

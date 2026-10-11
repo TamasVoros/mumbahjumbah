@@ -20,6 +20,10 @@ _Avoid_: Host, admin, operator (Organizer is a per-Session role; Operator is the
 A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked (when the timer arrives, until it starts). Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
 _Avoid_: Title, session title (Display Name is the Participant's, not this)
 
+**Pick Timer**:
+A 30-60 second (default 30) countdown the Organizer starts once the Session has a name. States: setup (no name), open (named, timer not started: Participants see a waiting screen), picking (timer running: Participants see the pick form and a synced countdown), locked. The timer ending and **Lock & Start Session!** are the same locked state; Lock & Start works before the timer starts, while it runs (stopping it) and after it ended. Fixed once started (no pause or extend; the name is frozen too). The server enforces it lazily on every request (`now >= timer_ends_at` persists `locked_at = timer_ends_at`); a late submission gets a 409 with the typed picks shown read-only. Strict cutoff, no grace window.
+_Avoid_: Countdown (the participant-side display of it), deadline
+
 **Invite Link**:
 The public, unauthenticated link shared with Participants to open a Session and submit a Grid. Grants no Organizer actions.
 _Avoid_: Session link, the link (ambiguous with Organizer Link)
