@@ -1,4 +1,5 @@
 import { html, raw } from "hono/html";
+import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
 
 // Placeholder pricing copied from mockups 6A / D6. Not real pricing (DESIGN.md open items).
 type Plan = {
@@ -86,9 +87,10 @@ export const plansPage = () => html`<!doctype html>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
-    <style>${raw(css)}</style>
+    <style>${raw(css)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
+    ${siteHeader()}
     <main>
       <h1>Plans</h1>
       <p class="sub">Start free. Pay when it’s your brand on the screen.</p>
@@ -105,5 +107,6 @@ export const plansPage = () => html`<!doctype html>
         )}
       </div>
     </main>
+    ${siteFooter()}
   </body>
 </html>`;

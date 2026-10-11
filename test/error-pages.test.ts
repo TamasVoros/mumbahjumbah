@@ -1,6 +1,7 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession, lockSession } from "../src/sessions";
+import { lockSession } from "../src/sessions";
+import { createSession } from "./helpers";
 
 describe("error pages", () => {
   it("404 uses the error card with DESIGN.md palette, type and way out", async () => {
@@ -30,7 +31,7 @@ describe("error pages", () => {
     const res = await SELF.fetch(`https://example.com/i/${s.invite_link_token}`);
     expect(res.status).toBe(403);
     const html = await res.text();
-    expect(html).toContain(`Session ${s.id} is locked`);
+    expect(html).toContain("Test session is locked");
     expect(html).toContain("The Organizer has locked this Session, so Grids can no longer be submitted or changed.");
     expect(html).toContain(`href="/i/${s.invite_link_token}/leaderboard"`);
     expect(html).toContain(`href="/i/${s.invite_link_token}/recap.png"`);

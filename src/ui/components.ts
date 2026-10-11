@@ -1,18 +1,21 @@
 import { html, raw } from "hono/html";
 import { CSS } from "./styles";
+import { CHROME_CSS, siteFooter, siteHeader } from "./chrome";
 import { COLOR as C } from "./tokens";
 
 /** Replaces the bare `page()` in src/index.ts. */
-export const shell = (title: string, body: unknown, opts: { board?: boolean; wide?: boolean } = {}) => html`<!doctype html>
+export const shell = (title: string, body: unknown, opts: { board?: boolean; wide?: boolean; organizer?: boolean } = {}) => html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
-    <style>${raw(CSS)}</style>
+    <style>${raw(CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body class="${opts.board ? "board" : ""}">
+    ${siteHeader({ organizer: opts.organizer })}
     <main class="screen ${opts.wide ? "screen--wide" : ""}">${body}</main>
+    ${siteFooter()}
   </body>
 </html>`;
 

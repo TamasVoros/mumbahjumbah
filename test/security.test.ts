@@ -1,7 +1,8 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { saveGrid, validateGrid } from "../src/grids";
-import { createSession, lockSession, parsePickCount } from "../src/sessions";
+import { lockSession, parsePickCount } from "../src/sessions";
+import { createSession } from "./helpers";
 
 describe("pick count cap", () => {
   it("accepts 1..100 and rejects the rest", () => {
@@ -43,10 +44,11 @@ describe("security headers", () => {
     }
     const created = await SELF.fetch("https://example.com/sessions", {
       method: "POST",
+      redirect: "manual",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ pick_preset: "5" }),
     });
-    expect(created.status).toBe(201);
+    expect(created.status).toBe(303);
     expect(created.headers.get("cache-control")).toBe("no-store");
   });
 });

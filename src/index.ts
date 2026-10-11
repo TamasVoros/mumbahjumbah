@@ -2,12 +2,15 @@ import { Hono, type Context } from "hono";
 import { html, raw } from "hono/html";
 import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
+import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
-import { entryView, lockedView, submittedView } from "./player-ui";
+import { entryView, lockedView, submittedView, timesUpView, waitingView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
 import { organizerView } from "./organizer";
+import { qrSvg } from "./qr";
+import { getDashboardStatus } from "./dashboard";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
   countParticipants,
@@ -17,6 +20,14 @@ import {
   lockSession,
   MAX_PICK_COUNT,
   parsePickCount,
+  parseSessionName,
+  parseTimerSeconds,
+  renameSession,
+  sessionState,
+  startTimer,
+  DEFAULT_TIMER_SECONDS,
+  MAX_TIMER_SECONDS,
+  MIN_TIMER_SECONDS,
   type Session,
 } from "./sessions";
 
@@ -74,9 +85,6 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 .wrap { padding-left: 24px; padding-right: 24px; }
 .container { max-width: 1120px; margin: 0 auto; }
 .hero { background: var(--indigo); color: var(--bone); padding-bottom: 32px; }
-.nav { display: flex; align-items: center; justify-content: space-between; padding-top: 20px; }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: inherit; text-decoration: none; }
-.brand:hover { color: inherit; }
 .hero-grid { display: grid; gap: 28px; margin-top: 22px; }
 .hero-copy { display: flex; flex-direction: column; gap: 14px; }
 .hero h1 { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -.01em; }
@@ -124,12 +132,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 .band h2 { font-weight: 800; font-size: 24px; line-height: 1.15; }
 .band .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .band .btn { padding: 13px 18px; font-size: 15px; width: auto; }
-.foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 20px; padding-bottom: 28px; font-size: 12px; color: var(--muted); }
 .plain { padding-top: 32px; padding-bottom: 32px; max-width: 720px; margin: 0 auto; }
 @media (min-width: 900px) {
   .wrap { padding-left: 80px; padding-right: 80px; }
-  .nav { height: 88px; padding-top: 0; }
-  .brand { font-size: 20px; gap: 10px; }
   .hero { padding-bottom: 88px; }
   .hero-grid { grid-template-columns: 1.15fr 1fr; gap: 80px; align-items: center; margin-top: 40px; }
   .hero-copy { gap: 22px; }
@@ -162,12 +167,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
   .band .container { flex-direction: row; align-items: center; justify-content: space-between; }
   .band h2 { font-size: 34px; line-height: 1.1; }
   .band .btn { padding: 16px 28px; font-size: 16px; }
-  .foot { padding-top: 28px; font-size: 13px; }
 }
 `;
-
-const logo = (fill: string, cut: string, w: number, h: number) =>
-  html`<svg width="${w}" height="${h}" viewBox="0 0 64 84" aria-hidden="true"><path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="${fill}"/><path d="M12 24L32 12L52 24" fill="none" stroke="${cut}" stroke-width="5"/><path d="M13 40L28 36L22 48Z" fill="${cut}"/><path d="M51 40L36 36L42 48Z" fill="${cut}"/><path d="M32 54L38 64L32 76L26 64Z" fill="${cut}"/></svg>`;
 
 // Other pages get a plain readable column until they are restyled; the landing page is full-bleed (bare).
 const page = (title: string, content: unknown, bare = false) => {
@@ -188,11 +189,13 @@ const shell = (title: string, body: unknown) => html`<!doctype html>
       href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
     />
     <style>
-      ${raw(CSS)}
+      ${raw(CSS)}${raw(CHROME_CSS)}
     </style>
   </head>
   <body>
+    ${siteHeader()}
     ${body}
+    ${siteFooter()}
   </body>
 </html>`;
 
@@ -210,9 +213,6 @@ const createForm = (error?: string) =>
     html`<header class="hero on-indigo">
         <div class="wrap">
           <div class="container">
-            <nav class="nav" aria-label="Main">
-              <a class="brand" href="/">${logo("#F4EFE6", "#1F2F63", 18, 24)}<span>MumbahJumbah</span></a>
-            </nav>
             <div class="hero-grid">
               <div class="hero-copy">
                 <div class="mono accent">Reverse bingo for meetings</div>
@@ -227,7 +227,7 @@ const createForm = (error?: string) =>
                   <h2>New session</h2>
                   ${error ? html`<p class="error" role="alert">${error}</p>` : ""}
                   <fieldset class="pills">
-                    <legend>Set your buzzword limit!</legend>
+                    <legend>Maximum picks</legend>
                     <div class="row">
                       <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
                       ${PICK_PRESETS.map(
@@ -236,7 +236,7 @@ const createForm = (error?: string) =>
                     </div>
                   </fieldset>
                   <label class="field" id="custom-pick">
-                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Buzzword limit" />
+                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Maximum picks" />
                     <span class="hint">Choose between 1 and ${MAX_PICK_COUNT}.</span>
                   </label>
                   <div>
@@ -257,7 +257,7 @@ const createForm = (error?: string) =>
               <h2>Three steps. One of them is a meeting.</h2>
             </div>
             <div class="steps">
-              <div class="step"><span class="n">1</span><div><h3>Create a session</h3><p>Pick how many words each player gets. Share the invite link.</p></div></div>
+              <div class="step"><span class="n">1</span><div><h3>Create a session</h3><p>Set the most words each player can pick. Share the invite link.</p></div></div>
               <div class="step"><span class="n">2</span><div><h3>Everyone predicts</h3><p>Each player locks in their jargon picks before the call.</p></div></div>
               <div class="step"><span class="n">3</span><div><h3>Meeting, then scores</h3><p>Upload the transcript after. The leaderboard writes itself.</p></div></div>
             </div>
@@ -265,7 +265,7 @@ const createForm = (error?: string) =>
         </section>
         <section class="wrap">
           <div class="container who">
-            <div class="mono">Privacy</div>
+            <div class="mono" id="privacy">Privacy</div>
             <div class="card"><p>Transcripts are never saved. That is our mojo!</p></div>
             <div class="card"><p>Picks and results are only saved as long as your session is live and open.</p></div>
             <div class="card"><p>Game telemetry is collected for logs without personal data.</p></div>
@@ -278,7 +278,6 @@ const createForm = (error?: string) =>
           </div>
         </section>
       </main>
-      <footer class="wrap"><div class="container foot"><span>© MumbahJumbah</span><span><a href="/plans">See plans</a> · Privacy · Terms</span></div></footer>
       <script>
         // The number input is always visible: picking 5 or 10 fills it in, typing in it switches back to Custom.
         // Without JS the checked preset wins on the server, so the form still works.
@@ -314,24 +313,14 @@ app.post("/sessions", async (c) => {
     return c.html(createForm("Pick Count must be a whole number from 1 to 100."), 400);
   }
   const session = await createSession(c.env.DB, pickCount);
-  const origin = new URL(c.req.url).origin;
-  const invite = `${origin}/i/${session.invite_link_token}`;
-  const organizer = `${origin}/o/${session.organizer_link_token}`;
-  return c.html(
-    page(
-      "Session created",
-      html`<h1>Session created</h1>
-        <p>Pick Count: ${session.pick_count}</p>
-        <p>Invite Link (share with Participants): <a id="invite-link" href="${invite}">${invite}</a></p>
-        <p>Organizer Link (keep private): <a id="organizer-link" href="${organizer}">${organizer}</a></p>`,
-    ),
-    201,
-  );
+  // Straight to the Organizer page, where the Session Name is set and the Invite Link then appears.
+  return c.redirect(`/o/${session.organizer_link_token}`, 303);
 });
 
 const errorCss = `
 *{box-sizing:border-box}
-body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;display:flex;justify-content:center;padding:32px 24px}
+body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;}
+.error-card{margin:32px auto}
 .error-card{width:100%;max-width:420px;border:1.5px solid #17140F;border-radius:2px;overflow:hidden;background:#F4EFE6;display:flex;flex-direction:column}
 .error-card header{background:#1F2F63;color:#F4EFE6;padding:24px;display:flex;flex-direction:column;gap:6px}
 .error-code{font-family:'Anton',sans-serif;font-size:56px;line-height:1;color:#E3C26E}
@@ -358,9 +347,10 @@ const errorPage = (
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;700;800&display=swap" rel="stylesheet" />
-    <style>${raw(errorCss)}</style>
+    <style>${raw(errorCss)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
+    ${siteHeader()}
     <main class="error-card">
       <header><span class="error-code">${code}</span><h1>${headline}</h1></header>
       <div class="error-body">
@@ -370,6 +360,7 @@ const errorPage = (
         </div>
       </div>
     </main>
+    ${siteFooter()}
   </body>
 </html>`;
 
@@ -382,34 +373,84 @@ const notFoundPage = () =>
     [{ href: "/", label: "Back to start" }],
   );
 
+// An Invite Link opened before the Organizer has saved a Session Name: a friendly 403, never a 404 or a pick form.
+const notOpenYetPage = () =>
+  uiShell(
+    "Not open yet",
+    errorCard("SOON", "This session isn’t open yet.", "The organizer hasn’t finished setting it up. Check back in a minute.", {
+      href: "",
+      label: "Try again",
+    }),
+  );
+
+const statusUrl = (s: Session) => `/i/${s.invite_link_token}/status`;
+
+// Only meaningful while the timer runs; `now` is the server clock the client derives its offset from.
+const timerInfo = (s: Session, now: number) => ({
+  endsAt: Date.parse(s.timer_ends_at ?? ""),
+  seconds: s.timer_seconds ?? 0,
+  now,
+  statusUrl: statusUrl(s),
+});
+
+const pickedWords = (raw: Record<string, unknown>) => [raw["pick"]].flat().filter((p): p is string => typeof p === "string");
+
+// Small JSON status for the participant pages (waiting screen and countdown). Never cached (see the /i/ rule above).
+app.get("/i/:token/status", async (c) => {
+  const now = Date.now();
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
+  if (!session) return c.json({ state: "unknown" }, 404);
+  const state = sessionState(session, now);
+  if (state === "setup") return c.json({ state }, 403);
+  return c.json({
+    state,
+    now,
+    endsAt: state === "picking" ? Date.parse(session.timer_ends_at ?? "") : null,
+    seconds: session.timer_seconds,
+  });
+});
+
 app.get("/i/:token", async (c) => {
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  const now = Date.now();
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
   if (!session) return c.html(notFoundPage(), 404);
-  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
-  return c.html(entryView(session.id, session.pick_count));
+  const state = sessionState(session, now);
+  if (state === "setup") return c.html(notOpenYetPage(), 403);
+  if (state === "locked") return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
+  if (state === "open") return c.html(waitingView(session.id, statusUrl(session), session.name));
+  return c.html(entryView(session.id, session.pick_count, {}, undefined, session.name, timerInfo(session, now)));
 });
 
 app.post("/i/:token", async (c) => {
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
+  const now = Date.now();
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
   if (!session) return c.html(notFoundPage(), 404);
-  if (session.locked_at) return c.html(lockedView(session.id, session.invite_link_token), 403);
+  const state = sessionState(session, now);
+  if (state === "setup") return c.html(notOpenYetPage(), 403);
+  if (state === "open") {
+    return c.html(waitingView(session.id, statusUrl(session), session.name, "The organizer hasn’t started the timer yet, so nothing was saved."), 409);
+  }
   const raw = await c.req.parseBody({ all: true });
+  // Strict cutoff: after lock or timer end the submission is rejected before validation, and what was typed is shown back read-only.
+  if (state === "locked") {
+    return c.html(timesUpView(session.id, session.invite_link_token, pickedWords(raw), session.name), 409);
+  }
   const result = validateGrid(raw, session.pick_count);
   if (!result.ok) {
-    const picks = [raw["pick"]].flat().filter((p): p is string => typeof p === "string");
+    const picks = pickedWords(raw);
     const values = {
       email: typeof raw["email"] === "string" ? raw["email"] : "",
       display_name: typeof raw["display_name"] === "string" ? raw["display_name"] : "",
       picks,
     };
-    return c.html(entryView(session.id, session.pick_count, values, result.error), 400);
+    return c.html(entryView(session.id, session.pick_count, values, result.error, session.name, timerInfo(session, now)), 400);
   }
   // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
   // Resubmitting under the same email is a deliberate edit/upsert, not an error.
-  if (!(await saveGrid(c.env.DB, session.id, result.value))) {
-    return c.html(lockedView(session.id, session.invite_link_token), 403);
+  if (!(await saveGrid(c.env.DB, session.id, result.value, now))) {
+    return c.html(timesUpView(session.id, session.invite_link_token, result.value.picks, session.name), 409);
   }
-  return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks));
+  return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks, session.name));
 });
 
 const organizersOnlyPage = (inviteToken: string) =>
@@ -437,9 +478,68 @@ app.get("/o/:token", async (c) => {
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
 });
 
-// Only an Organizer Link token can lock; Invite Link tokens never match here.
+// Live dashboard data, polled by the Organizer page. Organizer token only (invite token 403, unknown 404); names, never emails.
+app.get("/o/:token/status", async (c) => {
+  const token = c.req.param("token");
+  const now = Date.now();
+  const session = await findByOrganizerToken(c.env.DB, token, now);
+  if (!session) return organizerMissing(c, token);
+  return c.json(await getDashboardStatus(c.env.DB, session, now), 200, { "cache-control": "no-store" });
+});
+
+// Only an Organizer Link token can name the Session; editable until lock. Reveals the Invite Link once saved.
+app.post("/o/:token/name", async (c) => {
+  const token = c.req.param("token");
+  const existing = await findByOrganizerToken(c.env.DB, token);
+  if (!existing) return organizerMissing(c, token);
+  const origin = new URL(c.req.url).origin;
+  if (existing.locked_at || existing.timer_started_at) {
+    const why = existing.locked_at ? "The Session is locked" : "The timer has started";
+    return c.html(await organizerView(c.env.DB, existing, token, origin, { error: `${why}, so its name can’t change.` }), 409);
+  }
+  const form = await c.req.parseBody();
+  const name = parseSessionName(form["name"]);
+  if (name === null) {
+    return c.html(
+      await organizerView(c.env.DB, existing, token, origin, { error: "Session name must be 1 to 80 characters." }),
+      400,
+    );
+  }
+  const session = await renameSession(c.env.DB, token, name);
+  if (!session) return c.html(await organizerView(c.env.DB, existing, token, origin), 409);
+  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: "Name saved. Your invite link is ready." }));
+});
+
+// Only an Organizer Link token can start the pick timer: needs a name, 30-60 s (default 30), and it is fixed once started.
+app.post("/o/:token/timer", async (c) => {
+  const token = c.req.param("token");
+  const now = Date.now();
+  const existing = await findByOrganizerToken(c.env.DB, token, now);
+  if (!existing) return organizerMissing(c, token);
+  const origin = new URL(c.req.url).origin;
+  const fail = async (error: string, status: 400 | 409) =>
+    c.html(await organizerView(c.env.DB, existing, token, origin, { error }), status);
+  if (existing.locked_at) return fail("The Session is locked, so the timer can’t start.", 409);
+  if (existing.timer_started_at) return fail("The timer has already started and can’t be changed.", 409);
+  if (existing.name === null) return fail("Name the Session before starting the timer.", 409);
+  const form = await c.req.parseBody();
+  const seconds = form["seconds"] === undefined ? DEFAULT_TIMER_SECONDS : parseTimerSeconds(form["seconds"]);
+  if (seconds === null) return fail(`Timer length must be a whole number from ${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds.`, 400);
+  const session = await startTimer(c.env.DB, token, seconds, now);
+  if (!session) return fail("The timer could not be started.", 409);
+  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: `Timer started: ${seconds} seconds.` }));
+});
+
+// Only an Organizer Link token can lock; Invite Link tokens never match here. A nameless Session can't lock.
 app.post("/o/:token/lock", async (c) => {
   const token = c.req.param("token");
+  const unnamed = await findByOrganizerToken(c.env.DB, token);
+  if (unnamed && unnamed.name === null) {
+    return c.html(
+      await organizerView(c.env.DB, unnamed, token, new URL(c.req.url).origin, { error: "Name the Session before locking it." }),
+      409,
+    );
+  }
   const session = await lockSession(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
@@ -529,7 +629,7 @@ a:focus-visible{box-shadow:0 0 0 1.5px #1F2F63,0 0 0 5.5px rgba(31,47,99,.12)}
 }
 `;
 
-const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string) => {
+const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer = false) => {
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   const maxWord = Math.max(1, ...jargon.map((j) => j.occurrences));
   const topScore = Math.max(1, ...board.map((e) => e.score));
@@ -542,9 +642,10 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
-    <style>${raw(LEADERBOARD_CSS)}</style>
+    <style>${raw(LEADERBOARD_CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
+    ${siteHeader({ organizer })}
     <main class="lb-page">
       <section class="lb-jargon" aria-labelledby="jargon-h">
         <div class="mono">Results · Jargon</div>
@@ -559,8 +660,8 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
             </ul>`}
       </section>
       <section class="lb-board" aria-labelledby="lb-h">
-        <div class="mono">Session ${session.id}</div>
-        <h1 id="lb-h">Leaderboard: Session ${session.id}</h1>
+        <div class="mono">${session.name ?? `Session ${session.id}`}</div>
+        <h1 id="lb-h">Leaderboard: ${session.name ?? `Session ${session.id}`}</h1>
         ${board.length === 0
           ? html`<p>No Grids were submitted.</p>`
           : html`<table class="rows" role="table">
@@ -575,6 +676,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
         <a id="recap-link" class="recap" href="${recapUrl}">Recap Card (shareable PNG)</a>
       </section>
     </main>
+    ${siteFooter()}
   </body>
 </html>`;
 };
@@ -595,7 +697,7 @@ app.get("/o/:token/leaderboard", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   if (!session.locked_at) return c.html(notLocked(), 409);
-  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`));
+  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`, true));
 });
 
 const recap = async (db: D1Database, session: Session) => {
@@ -610,6 +712,18 @@ app.get("/i/:token/recap.png", async (c) => {
   if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return recap(c.env.DB, session);
+});
+
+// Downloadable invite QR for slides. Organizer token only; 404 until the Session is named (same gate as the link).
+app.get("/o/:token/invite-qr.svg", async (c) => {
+  const token = c.req.param("token");
+  const session = await findByOrganizerToken(c.env.DB, token);
+  if (!session) return organizerMissing(c, token);
+  if (session.name === null) return c.html(notFoundPage(), 404);
+  const invite = `${new URL(c.req.url).origin}/i/${session.invite_link_token}`;
+  return new Response(qrSvg(invite), {
+    headers: { "content-type": "image/svg+xml", "content-disposition": 'attachment; filename="invite-qr.svg"', "cache-control": "no-store" },
+  });
 });
 
 app.get("/o/:token/recap.png", async (c) => {

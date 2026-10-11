@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession } from "../src/sessions";
+import { createSession } from "./helpers";
 
 function submit(token: string, email: string, picks: string[]) {
   const body = new URLSearchParams();
@@ -26,9 +26,8 @@ describe("Organizer view", () => {
     await submit(s.invite_link_token, "a@x.com", ["one", "two"]);
     await submit(s.invite_link_token, "b@x.com", ["one", "two"]);
     const html = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
-    expect(html).toContain("Participants · 2");
-    expect(html).toContain("<span class=\"num\">2</span><span class=\"cap\">grids in</span>");
-    expect(html).toContain("Lock the grids");
+    expect(html).toContain("<span class=\"num\" data-stat=\"participants\">2</span>");
+    expect(html).toContain("Lock &amp; Start Session!");
     expect(html).toContain("chip--open");
     expect(html).not.toContain("a@x.com");
     expect(html).toContain(`action="/o/${s.organizer_link_token}/lock"`);
@@ -77,8 +76,8 @@ describe("Lock Session", () => {
     const s = await createSession(env.DB, 2);
     await lock(s.organizer_link_token);
     const res = await submit(s.invite_link_token, "new@x.com", ["a", "b"]);
-    expect(res.status).toBe(403);
-    expect(await res.text()).toContain("locked");
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain("Time’s up");
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM participants WHERE session_id = ?").bind(s.id).first<{ n: number }>();
     expect(n!.n).toBe(0);
   });
@@ -88,7 +87,7 @@ describe("Lock Session", () => {
     expect((await submit(s.invite_link_token, "a@x.com", ["a", "b"])).status).toBe(200);
     expect((await submit(s.invite_link_token, "a@x.com", ["c", "d"])).status).toBe(200);
     await lock(s.organizer_link_token);
-    expect((await submit(s.invite_link_token, "a@x.com", ["e", "f"])).status).toBe(403);
+    expect((await submit(s.invite_link_token, "a@x.com", ["e", "f"])).status).toBe(409);
     const { results } = await env.DB.prepare(
       "SELECT pk.pick FROM picks pk JOIN participants p ON p.id = pk.participant_id WHERE p.session_id = ? ORDER BY pk.pick",
     )

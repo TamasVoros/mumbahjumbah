@@ -27,7 +27,8 @@ describe("pick-entry script", () => {
     expect(t.$("pickapp").hidden).toBe(false);
     expect(t.$("count").textContent).toBe("YOUR PICKS · 0 / 3");
     expect(t.$<HTMLButtonElement>("submit").disabled).toBe(true);
-    expect(t.$("submit").textContent).toBe("Submit grid · 3 to go");
+    expect(t.$("submit").textContent).toBe("Add at least 1 pick");
+    expect(t.markup).toContain("up to 3 words or phrases");
   });
 
   it("Enter adds a pick as a normalised pill, clears the field, and does not submit", async () => {
@@ -37,7 +38,8 @@ describe("pick-entry script", () => {
     expect(t.pills()).toEqual(["synergy pivot"]);
     expect(t.field.value).toBe("");
     expect(t.$("count").textContent).toBe("YOUR PICKS · 1 / 3");
-    expect(t.$("submit").textContent).toBe("Submit grid · 2 to go");
+    expect(t.$("submit").textContent).toBe("Submit grid");
+    expect(t.$<HTMLButtonElement>("submit").disabled).toBe(false);
   });
 
   it("the Add button adds a pick too", async () => {
@@ -74,17 +76,21 @@ describe("pick-entry script", () => {
     expect(t.$("entry").hidden).toBe(false);
     expect(t.$("full").hidden).toBe(true);
     expect(t.$("count").textContent).toBe("YOUR PICKS · 1 / 2");
+    expect(t.$<HTMLButtonElement>("submit").disabled).toBe(false);
+    (t.document.querySelector("#pills li button") as HTMLButtonElement).click();
     expect(t.$<HTMLButtonElement>("submit").disabled).toBe(true);
   });
 
-  it("submit enables exactly at N picks, field is replaced by the full message, and no more can be added", async () => {
+  it("submit enables at 1 pick, stays enabled up to N, field is replaced by the full message at N, and no more can be added", async () => {
     const t = await load(2);
-    t.type("a");
     expect(t.$<HTMLButtonElement>("submit").disabled).toBe(true);
+    t.type("a");
+    expect(t.$<HTMLButtonElement>("submit").disabled).toBe(false);
+    expect(t.$("entry").hidden).toBe(false);
     t.type("b");
     expect(t.$<HTMLButtonElement>("submit").disabled).toBe(false);
     expect(t.$("submit").textContent).toBe("Submit grid");
-    expect(t.$("full").textContent).toContain("All 2 picked. Remove one to swap it.");
+    expect(t.$("full").textContent).toContain("Maximum of 2 reached. Remove one to swap it.");
     t.type("c");
     expect(t.pills()).toEqual(["a", "b"]);
     expect(t.$("fill").style.width).toBe("100%");
@@ -116,6 +122,34 @@ describe("pick-entry script", () => {
     const inputs = [...inner.querySelectorAll('input[name="pick"]')] as HTMLInputElement[];
     expect(inputs.length).toBe(4);
     expect(inputs[0]!.value).toBe("a");
+    expect(inputs.filter((i) => i.required).length).toBe(1); // tiles beyond the first may stay empty
     expect(inner.querySelector('button[type="submit"]')).not.toBeNull();
+  });
+});
+
+describe("countdown script", () => {
+  const withTimer = (endsInMs: number) => {
+    const now = Date.now();
+    const markup = String(
+      entryView(7, 3, { picks: [] }, undefined, "Standup", { endsAt: now + endsInMs, seconds: 30, now, statusUrl: "/i/t/status" }),
+    );
+    const dom = new JSDOM(markup, { runScripts: "dangerously" });
+    return { dom, doc: dom.window.document };
+  };
+
+  it("counts down from the server-time offset and keeps the form enabled while time is left", () => {
+    const { doc } = withTimer(20_000);
+    expect(doc.getElementById("timersecs")!.textContent).toMatch(/^(20|19) s$/);
+    expect(doc.getElementById("timerfill")!.style.width).toMatch(/^6\d(\.\d+)?%$/);
+    expect(doc.getElementById("timesup")!.hidden).toBe(true);
+    expect((doc.getElementById("pickfield") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("at zero disables the form, shows time's up, and leaves typed picks visible", () => {
+    const { doc } = withTimer(-1);
+    expect(doc.getElementById("timersecs")!.textContent).toBe("0 s");
+    expect(doc.getElementById("timesup")!.hidden).toBe(false);
+    expect((doc.getElementById("submit") as HTMLButtonElement).disabled).toBe(true);
+    expect((doc.getElementById("pickfield") as HTMLInputElement).disabled).toBe(true);
   });
 });

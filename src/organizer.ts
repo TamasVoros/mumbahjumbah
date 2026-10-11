@@ -1,11 +1,18 @@
 import { html, raw } from "hono/html";
+import { getDashboardStatus } from "./dashboard";
+import { dashboardPanel } from "./dashboard-ui";
 import { getJargonResult, getPickerCounts } from "./jargon";
-import { listParticipants, type Session } from "./sessions";
-import { chip, shell, wordmark, zigzag } from "./ui/components";
+import {
+  DEFAULT_TIMER_SECONDS,
+  MAX_TIMER_SECONDS,
+  MIN_TIMER_SECONDS,
+  sessionState,
+  type Session,
+} from "./sessions";
+import { qrSvg } from "./qr";
+import { chip, shell, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
-
-const VISIBLE_ROWS = 7;
 
 const UPLOAD_ICON = raw(
   `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 22V6M7 13l7-7 7 7" fill="none" stroke="#1F2F63" stroke-width="3"/></svg>`,
@@ -21,6 +28,13 @@ dz.addEventListener('drop',function(e){e.preventDefault();if(e.dataTransfer&&e.d
 file.addEventListener('change',sync);text.addEventListener('input',sync);sync()}
 [].forEach.call(document.querySelectorAll('[data-copy]'),function(b){if(!navigator.clipboard)return;b.hidden=false;b.addEventListener('click',function(){navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied'})})})})();`;
 
+// Organizer countdown (server-time offset); reloads at zero so the page shows the locked state the server now holds.
+const TIMER_JS = `(function(){var t=document.getElementById('org-timer');if(!t)return;
+var ends=+t.dataset.ends,total=+t.dataset.total*1000,off=+t.dataset.now-Date.now(),s=t.querySelector('[data-secs]'),f=t.querySelector('[data-fill]');
+function tick(){var l=ends-(Date.now()+off);if(l<=0){s.textContent='0';f.style.width='0';location.reload();return}
+s.textContent=Math.ceil(l/1000);f.style.width=Math.min(100,l/total*100)+'%';setTimeout(tick,250)}
+tick()})();`;
+
 export const organizerView = async (
   db: D1Database,
   session: Session,
@@ -29,65 +43,98 @@ export const organizerView = async (
   message?: OrganizerMessage,
 ) => {
   const locked = !!session.locked_at;
-  const [people, pickerCounts, jargon] = await Promise.all([
-    listParticipants(db, session.id),
+  const [dash, pickerCounts, jargon] = await Promise.all([
+    getDashboardStatus(db, session),
     getPickerCounts(db, session.id),
     locked ? getJargonResult(db, session.id) : Promise.resolve([]),
   ]);
-  const count = people.length;
   const invite = `${origin}/i/${session.invite_link_token}`;
 
   const messages = html`${message?.error ? html`<p class="msg" role="alert">${message.error}</p>` : ""}${message?.ok
     ? html`<p class="msg" role="status">${message.ok}</p>`
     : ""}`;
 
-  const stats = html`<div class="stats stats--3">
-    <div class="stat"><span class="num">${count}</span><span class="cap">grids in</span></div>
-    <div class="stat"><span class="num">${session.pick_count}</span><span class="cap">picks each</span></div>
-    <div class="stat"><span class="num">${pickerCounts.size}</span><span class="cap">unique words</span></div>
-  </div>`;
+  const panel = dashboardPanel(
+    dash,
+    `/o/${token}/status`,
+    !locked,
+    session.name === null
+      ? "Nobody yet. Name the Session to get an invite link to share."
+      : "Nobody has joined yet. Share the invite link and this table fills itself.",
+  );
 
-  const peopleList =
-    count === 0
-      ? html`<p class="small muted">No grids yet. Share the invite link and the list fills itself.</p>`
-      : html`<ul class="people ${count > VISIBLE_ROWS ? "people--scroll scroll" : ""}" aria-label="Participants">
-            ${people.map((p) => html`<li class="person"><span class="nm">${p.display_name}</span>${chip("submitted")}</li>`)}
-          </ul>
-          ${count > VISIBLE_ROWS
-            ? html`<div class="scrollhint"><span>Scroll for all ${count}</span><span>↓ ${count - VISIBLE_ROWS} more</span></div>`
-            : ""}`;
+  const inviteCard =
+    session.name === null
+      ? ""
+      : html`<section class="invite" aria-labelledby="invite-title">
+          <h2 id="invite-title">Invite link</h2>
+          <div class="invite__qr">${raw(qrSvg(invite))}</div>
+          <a class="mono invite__url" id="invite-link" href="${invite}">${invite}</a>
+          <div class="invite__actions">
+            <button type="button" class="btn btn--secondary" hidden data-copy="${invite}">Copy link</button>
+            <a class="btn btn--ghost" href="/o/${token}/invite-qr.svg" download="invite-qr.svg">Download QR (SVG)</a>
+          </div>
+          <p class="small muted">Show it on screen or paste the QR into your deck. Anyone with this link can join.</p>
+        </section>`;
 
-  const inviteCard = html`<div class="linkcard">
-    <div class="hd"><b>Invite link</b><button type="button" hidden data-copy="${invite}">Copy</button></div>
-    <a class="mono" id="invite-link" href="${invite}">${invite}</a>
-  </div>`;
+  const named = session.name !== null;
+  const nameForm = html`<form class="stack" method="post" action="/o/${token}/name">
+    <label class="label" for="session-name">Session name</label>
+    <input class="field" id="session-name" name="name" type="text" maxlength="80" required
+      value="${session.name ?? ""}" placeholder="e.g. Q3 all-hands" autocomplete="off" />
+    <p class="small muted">${named
+      ? "Participants see this name. You can change it until you lock the Session."
+      : "Name the Session to get your invite link. Participants see this name."}</p>
+    <button class="btn btn--secondary" type="submit">${named ? "Save name" : "Save name and get invite link"}</button>
+  </form>`;
 
-  const header = html`<div class="topbar">${wordmark()}<span class="label">Organizer view</span></div>
-    <div class="titlebar"><h1>Organizer: Session ${session.id}</h1>${locked ? chip("locked") : chip("open")}</div>`;
+  const now = Date.now();
+  const state = sessionState(session, now);
+  const stateChip = { setup: chip("pending", "SETUP"), open: chip("open"), picking: chip("pending", "PICKING"), locked: chip("locked") }[state];
+  const header = html`<div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${stateChip}</div>`;
+
+  // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
+  const timerCard =
+    state === "picking"
+      ? html`<div class="stack" id="org-timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
+          <p class="label">Timer running</p>
+          <p style="font:400 36px/1 Anton,Impact,sans-serif"><span data-secs>${Math.max(0, Math.ceil((Date.parse(session.timer_ends_at ?? "") - now) / 1000))}</span> s</p>
+          <div class="progress"><i data-fill style="width:100%"></i></div>
+          <p class="small muted">Participants are picking. When it hits zero the Session locks by itself, or lock it sooner below.</p>
+        </div>`
+      : html`<form class="stack" method="post" action="/o/${token}/timer">
+          <label class="label" for="timer-seconds">Pick timer (seconds)</label>
+          <input class="field" id="timer-seconds" name="seconds" type="number" min="${MIN_TIMER_SECONDS}" max="${MAX_TIMER_SECONDS}" step="1"
+            value="${DEFAULT_TIMER_SECONDS}" required inputmode="numeric" />
+          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. Participants wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
+          <button class="btn btn--secondary" type="submit">Start timer</button>
+        </form>`;
 
   if (!locked) {
     return shell(
       "Organizer",
       html`${header}${messages}
         <div class="cols">
-          <div class="stack">${stats}
-            <p class="label">Participants · ${count}</p>
-            ${peopleList}
-          </div>
+          <div class="stack">${panel}</div>
           <div class="stack">
-            <div class="cta-card">
-              <form method="post" action="/o/${token}/lock">
-                <div class="pad pad--top"><h2>Ready to start?</h2>
-                  <p class="small muted">Locking can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
-                ${zigzag(true)}
-                <div class="pad"><button class="btn btn--primary" type="submit">Lock the grids</button></div>
-              </form>
-            </div>
-            ${inviteCard}
+            ${state === "picking" ? "" : nameForm}
+            ${named
+              ? html`${timerCard}
+                  <div class="cta-card">
+                    <form method="post" action="/o/${token}/lock">
+                      <div class="pad pad--top"><h2>Ready to start?</h2>
+                        <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
+                      ${zigzag(true)}
+                      <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
+                    </form>
+                  </div>
+                  ${inviteCard}`
+              : ""}
           </div>
         </div>
-        <script>${raw(PAGE_JS)}</script>`,
-      { wide: true },
+        <script>${raw(PAGE_JS)}</script>
+        ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
+      { wide: true, organizer: true },
     );
   }
 
@@ -118,6 +165,7 @@ export const organizerView = async (
     "Organizer",
     html`${header}${messages}
       <p class="muted">This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted. The meeting’s over. Hand us the transcript.</p>
+      ${panel}
       <div class="cols">
         <div class="stack"><h2>Jargon Result</h2>${results}
           <a class="btn btn--primary" href="/o/${token}/leaderboard">See the leaderboard</a>
@@ -137,6 +185,6 @@ export const organizerView = async (
         </div>
       </div>
       <script>${raw(PAGE_JS)}</script>`,
-    { wide: true },
+    { wide: true, organizer: true },
   );
 };

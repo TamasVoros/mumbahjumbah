@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession } from "../src/sessions";
+import { createSession } from "./helpers";
 
 async function newSession(pickCount: number) {
   return createSession(env.DB, pickCount);
@@ -51,12 +51,34 @@ describe("Submit Grid", () => {
     expect(p).toMatchObject({ display_name: "Ann" });
   });
 
-  it("rejects too few and too many picks", async () => {
+  it("accepts 1..N picks (Pick Count is a maximum)", async () => {
     const s = await newSession(3);
-    expect((await submit(s.invite_link_token, "a@b.co", ["a", "b"])).status).toBe(400);
-    expect((await submit(s.invite_link_token, "a@b.co", ["a", "b", "c", "d"])).status).toBe(400);
-    expect((await submit(s.invite_link_token, "a@b.co", ["a", "b", " "])).status).toBe(400);
+    for (const [i, picks] of [["a"], ["a", "b"], ["a", "b", "c"]].entries()) {
+      const res = await submit(s.invite_link_token, `p${i}@b.co`, picks);
+      expect(res.status).toBe(200);
+      expect(await picksFor(s.id, `p${i}@b.co`)).toEqual(picks);
+    }
+  });
+
+  it("rejects zero and more than N picks with a clear message", async () => {
+    const s = await newSession(3);
+    const none = await submit(s.invite_link_token, "a@b.co", []);
+    expect(none.status).toBe(400);
+    expect(await none.text()).toContain("Submit between 1 and 3 picks (you submitted 0)");
+    const blank = await submit(s.invite_link_token, "a@b.co", [" ", ""]);
+    expect(blank.status).toBe(400);
+    const many = await submit(s.invite_link_token, "a@b.co", ["a", "b", "c", "d"]);
+    expect(many.status).toBe(400);
+    expect(await many.text()).toContain("Submit between 1 and 3 picks (you submitted 4)");
     expect(await countParticipants(s.id)).toBe(0);
+  });
+
+  it("resubmission may change the number of picks", async () => {
+    const s = await newSession(3);
+    await submit(s.invite_link_token, "a@b.co", ["a", "b", "c"]);
+    expect((await submit(s.invite_link_token, "a@b.co", ["z"])).status).toBe(200);
+    expect(await picksFor(s.id, "a@b.co")).toEqual(["z"]);
+    expect(await countParticipants(s.id)).toBe(1);
   });
 
   it("rejects duplicates (after normalization) with a clear error and stores nothing", async () => {
@@ -100,7 +122,7 @@ describe("Submit Grid", () => {
     expect((await submit(s.invite_link_token, "a@b.co", ["x"], " ")).status).toBe(400);
     expect((await submit("nope", "a@b.co", ["x"])).status).toBe(404);
     await env.DB.prepare("UPDATE sessions SET locked_at = '2026-01-01' WHERE id = ?").bind(s.id).run();
-    expect((await submit(s.invite_link_token, "a@b.co", ["x"])).status).toBe(403);
+    expect((await submit(s.invite_link_token, "a@b.co", ["x"])).status).toBe(409);
   });
 
   it("escapes user input when re-rendering the form on error", async () => {

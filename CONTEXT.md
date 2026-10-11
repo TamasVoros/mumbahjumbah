@@ -16,6 +16,14 @@ _Avoid_: Account, tenant, team (reserve for later multi-Operator/cross-Operator 
 The person who creates a Session, sets its Pick Count, and starts/locks it. Belongs to exactly one Operator. In v1, the sole Operator is also the only Organizer, so the two collapse into one person — kept as separate concepts so Approach B (an Operator with multiple staff each organizing sessions) doesn't require renaming anything later.
 _Avoid_: Host, admin, operator (Organizer is a per-Session role; Operator is the account)
 
+**Session Name**:
+A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked (when the timer arrives, until it starts). Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
+_Avoid_: Title, session title (Display Name is the Participant's, not this)
+
+**Pick Timer**:
+A 30-60 second (default 30) countdown the Organizer starts once the Session has a name. States: setup (no name), open (named, timer not started: Participants see a waiting screen), picking (timer running: Participants see the pick form and a synced countdown), locked. The timer ending and **Lock & Start Session!** are the same locked state; Lock & Start works before the timer starts, while it runs (stopping it) and after it ended. Fixed once started (no pause or extend; the name is frozen too). The server enforces it lazily on every request (`now >= timer_ends_at` persists `locked_at = timer_ends_at`); a late submission gets a 409 with the typed picks shown read-only. Strict cutoff, no grace window.
+_Avoid_: Countdown (the participant-side display of it), deadline
+
 **Invite Link**:
 The public, unauthenticated link shared with Participants to open a Session and submit a Grid. Grants no Organizer actions.
 _Avoid_: Session link, the link (ambiguous with Organizer Link)
@@ -37,11 +45,11 @@ A cosmetic, freely-editable label a Participant sets per Session for the leaderb
 _Avoid_: Name, username
 
 **Grid**:
-A Participant's set of exactly Pick Count distinct Picks for a Session. Purely a flat set — no row/column/line scoring, no positional meaning. Rendered visually as tiles for the bingo feel, but the data model has no shape concept. One Grid per (Participant Email, Session) — resubmitting before lock upserts the existing Grid rather than creating a duplicate leaderboard row.
+A Participant's set of 1 up to Pick Count distinct Picks for a Session. Purely a flat set — no row/column/line scoring, no positional meaning. Rendered visually as tiles for the bingo feel, but the data model has no shape concept. One Grid per (Participant Email, Session) — resubmitting before lock upserts the existing Grid rather than creating a duplicate leaderboard row.
 _Avoid_: Card, board, picks (picks are the words themselves, the grid is the container)
 
 **Pick Count**:
-The number of Picks a Grid must contain for a given Session, set by the Organizer when creating the invite link (e.g. 9 or 25 as suggested presets — any positive integer is valid, not constrained to a perfect square). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
+The maximum number of Picks a Grid may contain for a given Session, set by the Organizer when creating the Session (labelled "Maximum picks"; any integer from 1 to 100 is valid, not constrained to a perfect square). A Grid holds between 1 and Pick Count Picks; Score is unchanged (sum of occurrence counts), so fewer Picks simply means fewer chances to score. See [ADR-0003](docs/adr/0003-pick-count-is-a-maximum.md). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
 _Avoid_: Grid size, dimensions (no x/y shape exists in the model)
 
 **Pick**:
@@ -76,7 +84,7 @@ _Avoid_: Custom branding, theming (White-Label is the canonical term — it's th
 
 - An **Operator** owns one or more **Sessions**; an **Organizer** belongs to exactly one **Operator** and creates **Sessions** on its behalf (v1: one Operator, who is also the sole Organizer)
 - Creating a **Session** generates exactly one **Invite Link** (for Participants) and exactly one **Organizer Link** (for the Organizer) — distinct capabilities, same Session
-- A **Session** has exactly one **Pick Count**, set by the Organizer; every **Grid** submitted for that **Session** must contain exactly that many **Picks**
+- A **Session** has exactly one **Pick Count**, set by the Organizer; every **Grid** submitted for that **Session** must contain between 1 and that many **Picks**
 - A **Participant** submits exactly one **Grid** (a set of **Picks**) per **Session**
 - A **Participant** is identified across **Sessions** by **Email**; **Display Name** is per-Session and cosmetic only
 - A **Session** has at most one uploaded **Transcript**, which produces exactly one **Jargon Result** and is then discarded
