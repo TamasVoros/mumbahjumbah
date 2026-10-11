@@ -153,7 +153,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
   .step .n { font-size: 44px; width: auto; }
   .step h3 { font-size: 18px; }
   .step p { font-size: 14px; line-height: 1.5; margin-top: 0; }
-  .who { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 0 0 80px; }
+  .who { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; padding: 0 0 80px; }
   .who .mono { grid-column: 1 / -1; }
   .who .card { padding: 32px; gap: 8px; }
   .who h3 { font-size: 24px; }
@@ -265,14 +265,15 @@ const createForm = (error?: string) =>
         </section>
         <section class="wrap">
           <div class="container who">
-            <div class="mono">Who it’s for</div>
-            <div class="card"><h3>Teams</h3><p>A two-minute warm-up that makes the all-hands worth listening to.</p></div>
-            <div class="card"><h3>Coaches &amp; facilitators</h3><p>Run it in your workshops, under your own brand and link.</p></div>
+            <div class="mono">Privacy</div>
+            <div class="card"><p>Transcripts are never saved. That is our mojo!</p></div>
+            <div class="card"><p>Picks and results are only saved as long as your session is live and open.</p></div>
+            <div class="card"><p>Game telemetry is collected for logs without personal data.</p></div>
           </div>
         </section>
         <section class="band wrap">
           <div class="container">
-            <h2>Free for a team. Branded for a coach.</h2>
+            <h2>C’mon, get your mumbah-jumbah together!</h2>
             <div class="actions"><a class="btn btn-red" href="#new">Create a session</a></div>
           </div>
         </section>

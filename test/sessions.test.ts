@@ -79,13 +79,18 @@ describe("Create Session", () => {
       expect(body).toContain("border-radius: 2px");
     });
 
-    it("has marketing sections: hero, how it works, who it's for, bottom CTA band, footer", async () => {
+    it("has marketing sections: hero, how it works, privacy, bottom CTA band, footer", async () => {
       const body = await get();
       expect(body).toContain("Predict the jargon. Win the meeting.");
       expect(body).toContain('id="how"');
       expect(body).toContain("Three steps. One of them is a meeting.");
-      expect(body).toContain("Coaches &amp; facilitators");
-      expect(body).toContain("Free for a team. Branded for a coach.");
+      expect(body).toContain("Transcripts are never saved. That is our mojo!");
+      expect(body).toContain("Picks and results are only saved as long as your session is live and open.");
+      expect(body).toContain("Game telemetry is collected for logs without personal data.");
+      expect(body).toContain("C’mon, get your mumbah-jumbah together!");
+      expect(body).not.toContain("Who it’s for");
+      expect(body).not.toContain("Coaches");
+      expect(body).not.toContain("Free for a team");
       expect(body).toContain("<footer");
     });
 
