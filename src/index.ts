@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { html, raw } from "hono/html";
 import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
+import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
 import { entryView, lockedView, submittedView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
@@ -76,9 +77,6 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 .wrap { padding-left: 24px; padding-right: 24px; }
 .container { max-width: 1120px; margin: 0 auto; }
 .hero { background: var(--indigo); color: var(--bone); padding-bottom: 32px; }
-.nav { display: flex; align-items: center; justify-content: space-between; padding-top: 20px; }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 17px; color: inherit; text-decoration: none; }
-.brand:hover { color: inherit; }
 .hero-grid { display: grid; gap: 28px; margin-top: 22px; }
 .hero-copy { display: flex; flex-direction: column; gap: 14px; }
 .hero h1 { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -.01em; }
@@ -126,12 +124,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 .band h2 { font-weight: 800; font-size: 24px; line-height: 1.15; }
 .band .actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .band .btn { padding: 13px 18px; font-size: 15px; width: auto; }
-.foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 20px; padding-bottom: 28px; font-size: 12px; color: var(--muted); }
 .plain { padding-top: 32px; padding-bottom: 32px; max-width: 720px; margin: 0 auto; }
 @media (min-width: 900px) {
   .wrap { padding-left: 80px; padding-right: 80px; }
-  .nav { height: 88px; padding-top: 0; }
-  .brand { font-size: 20px; gap: 10px; }
   .hero { padding-bottom: 88px; }
   .hero-grid { grid-template-columns: 1.15fr 1fr; gap: 80px; align-items: center; margin-top: 40px; }
   .hero-copy { gap: 22px; }
@@ -164,12 +159,8 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
   .band .container { flex-direction: row; align-items: center; justify-content: space-between; }
   .band h2 { font-size: 34px; line-height: 1.1; }
   .band .btn { padding: 16px 28px; font-size: 16px; }
-  .foot { padding-top: 28px; font-size: 13px; }
 }
 `;
-
-const logo = (fill: string, cut: string, w: number, h: number) =>
-  html`<svg width="${w}" height="${h}" viewBox="0 0 64 84" aria-hidden="true"><path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="${fill}"/><path d="M12 24L32 12L52 24" fill="none" stroke="${cut}" stroke-width="5"/><path d="M13 40L28 36L22 48Z" fill="${cut}"/><path d="M51 40L36 36L42 48Z" fill="${cut}"/><path d="M32 54L38 64L32 76L26 64Z" fill="${cut}"/></svg>`;
 
 // Other pages get a plain readable column until they are restyled; the landing page is full-bleed (bare).
 const page = (title: string, content: unknown, bare = false) => {
@@ -190,11 +181,13 @@ const shell = (title: string, body: unknown) => html`<!doctype html>
       href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
     />
     <style>
-      ${raw(CSS)}
+      ${raw(CSS)}${raw(CHROME_CSS)}
     </style>
   </head>
   <body>
+    ${siteHeader()}
     ${body}
+    ${siteFooter()}
   </body>
 </html>`;
 
@@ -212,9 +205,6 @@ const createForm = (error?: string) =>
     html`<header class="hero on-indigo">
         <div class="wrap">
           <div class="container">
-            <nav class="nav" aria-label="Main">
-              <a class="brand" href="/">${logo("#F4EFE6", "#1F2F63", 18, 24)}<span>MumbahJumbah</span></a>
-            </nav>
             <div class="hero-grid">
               <div class="hero-copy">
                 <div class="mono accent">Reverse bingo for meetings</div>
@@ -267,7 +257,7 @@ const createForm = (error?: string) =>
         </section>
         <section class="wrap">
           <div class="container who">
-            <div class="mono">Privacy</div>
+            <div class="mono" id="privacy">Privacy</div>
             <div class="card"><p>Transcripts are never saved. That is our mojo!</p></div>
             <div class="card"><p>Picks and results are only saved as long as your session is live and open.</p></div>
             <div class="card"><p>Game telemetry is collected for logs without personal data.</p></div>
@@ -280,7 +270,6 @@ const createForm = (error?: string) =>
           </div>
         </section>
       </main>
-      <footer class="wrap"><div class="container foot"><span>© MumbahJumbah</span><span><a href="/plans">See plans</a> · Privacy · Terms</span></div></footer>
       <script>
         // The number input is always visible: picking 5 or 10 fills it in, typing in it switches back to Custom.
         // Without JS the checked preset wins on the server, so the form still works.
@@ -322,7 +311,8 @@ app.post("/sessions", async (c) => {
 
 const errorCss = `
 *{box-sizing:border-box}
-body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;display:flex;justify-content:center;padding:32px 24px}
+body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;}
+.error-card{margin:32px auto}
 .error-card{width:100%;max-width:420px;border:1.5px solid #17140F;border-radius:2px;overflow:hidden;background:#F4EFE6;display:flex;flex-direction:column}
 .error-card header{background:#1F2F63;color:#F4EFE6;padding:24px;display:flex;flex-direction:column;gap:6px}
 .error-code{font-family:'Anton',sans-serif;font-size:56px;line-height:1;color:#E3C26E}
@@ -349,9 +339,10 @@ const errorPage = (
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;700;800&display=swap" rel="stylesheet" />
-    <style>${raw(errorCss)}</style>
+    <style>${raw(errorCss)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
+    ${siteHeader()}
     <main class="error-card">
       <header><span class="error-code">${code}</span><h1>${headline}</h1></header>
       <div class="error-body">
@@ -361,6 +352,7 @@ const errorPage = (
         </div>
       </div>
     </main>
+    ${siteFooter()}
   </body>
 </html>`;
 
@@ -561,7 +553,7 @@ a:focus-visible{box-shadow:0 0 0 1.5px #1F2F63,0 0 0 5.5px rgba(31,47,99,.12)}
 }
 `;
 
-const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string) => {
+const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer = false) => {
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   const maxWord = Math.max(1, ...jargon.map((j) => j.occurrences));
   const topScore = Math.max(1, ...board.map((e) => e.score));
@@ -574,9 +566,10 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
-    <style>${raw(LEADERBOARD_CSS)}</style>
+    <style>${raw(LEADERBOARD_CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
+    ${siteHeader({ organizer })}
     <main class="lb-page">
       <section class="lb-jargon" aria-labelledby="jargon-h">
         <div class="mono">Results · Jargon</div>
@@ -607,6 +600,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
         <a id="recap-link" class="recap" href="${recapUrl}">Recap Card (shareable PNG)</a>
       </section>
     </main>
+    ${siteFooter()}
   </body>
 </html>`;
 };
@@ -627,7 +621,7 @@ app.get("/o/:token/leaderboard", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   if (!session.locked_at) return c.html(notLocked(), 409);
-  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`));
+  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`, true));
 });
 
 const recap = async (db: D1Database, session: Session) => {

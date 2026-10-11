@@ -1,7 +1,7 @@
 import { html, raw } from "hono/html";
 import { getJargonResult, getPickerCounts } from "./jargon";
 import { listParticipants, type Session } from "./sessions";
-import { chip, shell, wordmark, zigzag } from "./ui/components";
+import { chip, shell, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
 
@@ -75,8 +75,7 @@ export const organizerView = async (
     <button class="btn btn--secondary" type="submit">${named ? "Save name" : "Save name and get invite link"}</button>
   </form>`;
 
-  const header = html`<div class="topbar">${wordmark()}<span class="label">Organizer view</span></div>
-    <div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${locked ? chip("locked") : chip("open")}</div>`;
+  const header = html`<div class="titlebar"><h1>${session.name ?? `Session ${session.id}`}</h1>${locked ? chip("locked") : chip("open")}</div>`;
 
   if (!locked) {
     return shell(
@@ -103,7 +102,7 @@ export const organizerView = async (
           </div>
         </div>
         <script>${raw(PAGE_JS)}</script>`,
-      { wide: true },
+      { wide: true, organizer: true },
     );
   }
 
@@ -153,6 +152,6 @@ export const organizerView = async (
         </div>
       </div>
       <script>${raw(PAGE_JS)}</script>`,
-    { wide: true },
+    { wide: true, organizer: true },
   );
 };

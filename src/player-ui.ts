@@ -1,4 +1,5 @@
 import { html, raw } from "hono/html";
+import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
 
 // Player-facing invite-link screens, styled per DESIGN.md (direction 2A).
 // Mockups: Desktop D3 (entry), Screens 3B (submitted), 3C (locked).
@@ -99,14 +100,15 @@ const shell = (title: string, status: "open" | "submitted" | "locked", main: unk
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
     ${fontLink}
-    <style>${raw(css)}</style>
+    <style>${raw(css)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
-    <div class="head"><b>MumbahJumbah</b><span class="chip ${status}">${status}</span></div>
+    ${siteHeader()}
     <div class="wrap${side ? "" : " single"}">
       <div class="main">${main}</div>
       ${side ?? ""}
     </div>
+    ${siteFooter()}
     ${script ? html`<script>${raw(script)}</script>` : ""}
   </body>
 </html>`;
