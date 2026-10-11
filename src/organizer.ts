@@ -9,6 +9,7 @@ import {
   sessionState,
   type Session,
 } from "./sessions";
+import { qrSvg } from "./qr";
 import { chip, shell, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
@@ -62,10 +63,19 @@ export const organizerView = async (
       : "Nobody has joined yet. Share the invite link and this table fills itself.",
   );
 
-  const inviteCard = html`<div class="linkcard">
-    <div class="hd"><b>Invite link</b><button type="button" hidden data-copy="${invite}">Copy</button></div>
-    <a class="mono" id="invite-link" href="${invite}">${invite}</a>
-  </div>`;
+  const inviteCard =
+    session.name === null
+      ? ""
+      : html`<section class="invite" aria-labelledby="invite-title">
+          <h2 id="invite-title">Invite link</h2>
+          <div class="invite__qr">${raw(qrSvg(invite))}</div>
+          <a class="mono invite__url" id="invite-link" href="${invite}">${invite}</a>
+          <div class="invite__actions">
+            <button type="button" class="btn btn--secondary" hidden data-copy="${invite}">Copy link</button>
+            <a class="btn btn--ghost" href="/o/${token}/invite-qr.svg" download="invite-qr.svg">Download QR (SVG)</a>
+          </div>
+          <p class="small muted">Show it on screen or paste the QR into your deck. Anyone with this link can join.</p>
+        </section>`;
 
   const named = session.name !== null;
   const nameForm = html`<form class="stack" method="post" action="/o/${token}/name">

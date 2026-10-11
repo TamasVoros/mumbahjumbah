@@ -9,6 +9,7 @@ import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
 import { organizerView } from "./organizer";
+import { qrSvg } from "./qr";
 import { getDashboardStatus } from "./dashboard";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
@@ -711,6 +712,18 @@ app.get("/i/:token/recap.png", async (c) => {
   if (!session) return c.html(notFoundPage(), 404);
   if (!session.locked_at) return c.html(notLocked(), 409);
   return recap(c.env.DB, session);
+});
+
+// Downloadable invite QR for slides. Organizer token only; 404 until the Session is named (same gate as the link).
+app.get("/o/:token/invite-qr.svg", async (c) => {
+  const token = c.req.param("token");
+  const session = await findByOrganizerToken(c.env.DB, token);
+  if (!session) return organizerMissing(c, token);
+  if (session.name === null) return c.html(notFoundPage(), 404);
+  const invite = `${new URL(c.req.url).origin}/i/${session.invite_link_token}`;
+  return new Response(qrSvg(invite), {
+    headers: { "content-type": "image/svg+xml", "content-disposition": 'attachment; filename="invite-qr.svg"', "cache-control": "no-store" },
+  });
 });
 
 app.get("/o/:token/recap.png", async (c) => {

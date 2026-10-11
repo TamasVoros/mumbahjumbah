@@ -119,6 +119,14 @@ textarea.field{height:96px;resize:vertical}
 .linkcard button:focus-visible{outline:2px solid var(--indigo)}
 .linkcard button[hidden]{display:none}
 .linkcard .mono{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.invite{display:flex;flex-direction:column;gap:14px;background:var(--paper);border:var(--b);border-radius:2px;padding:20px 22px;min-width:0}
+.invite h2{font-size:18px}
+.invite__qr{align-self:center;width:100%;max-width:280px;border:var(--b);background:#fff;line-height:0}
+.invite__qr svg{display:block;width:100%;height:auto}
+.invite__url{font-size:14px;color:var(--ink);overflow-wrap:anywhere;word-break:break-all}
+.invite__actions{display:flex;flex-wrap:wrap;gap:8px}
+.invite__actions .btn{flex:1 1 160px;min-height:44px;text-align:center}
+.invite__actions .btn[hidden]{display:none}
 .words{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
 .words--scroll{max-height:410px}
 .word .by{white-space:nowrap}.word .t{min-width:0;overflow-wrap:anywhere}
