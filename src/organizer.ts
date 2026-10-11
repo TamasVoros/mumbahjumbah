@@ -1,8 +1,9 @@
 import { html, raw } from "hono/html";
+import { getDashboardStatus } from "./dashboard";
+import { dashboardPanel } from "./dashboard-ui";
 import { getJargonResult, getPickerCounts } from "./jargon";
 import {
   DEFAULT_TIMER_SECONDS,
-  listParticipants,
   MAX_TIMER_SECONDS,
   MIN_TIMER_SECONDS,
   sessionState,
@@ -11,8 +12,6 @@ import {
 import { chip, shell, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
-
-const VISIBLE_ROWS = 7;
 
 const UPLOAD_ICON = raw(
   `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 22V6M7 13l7-7 7 7" fill="none" stroke="#1F2F63" stroke-width="3"/></svg>`,
@@ -43,35 +42,25 @@ export const organizerView = async (
   message?: OrganizerMessage,
 ) => {
   const locked = !!session.locked_at;
-  const [people, pickerCounts, jargon] = await Promise.all([
-    listParticipants(db, session.id),
+  const [dash, pickerCounts, jargon] = await Promise.all([
+    getDashboardStatus(db, session),
     getPickerCounts(db, session.id),
     locked ? getJargonResult(db, session.id) : Promise.resolve([]),
   ]);
-  const count = people.length;
   const invite = `${origin}/i/${session.invite_link_token}`;
 
   const messages = html`${message?.error ? html`<p class="msg" role="alert">${message.error}</p>` : ""}${message?.ok
     ? html`<p class="msg" role="status">${message.ok}</p>`
     : ""}`;
 
-  const stats = html`<div class="stats stats--3">
-    <div class="stat"><span class="num">${count}</span><span class="cap">grids in</span></div>
-    <div class="stat"><span class="num">${session.pick_count}</span><span class="cap">picks each</span></div>
-    <div class="stat"><span class="num">${pickerCounts.size}</span><span class="cap">unique words</span></div>
-  </div>`;
-
-  const peopleList =
-    count === 0
-      ? html`<p class="small muted">${session.name === null
-            ? "No grids yet. Name the Session to get an invite link to share."
-            : "No grids yet. Share the invite link and the list fills itself."}</p>`
-      : html`<ul class="people ${count > VISIBLE_ROWS ? "people--scroll scroll" : ""}" aria-label="Participants">
-            ${people.map((p) => html`<li class="person"><span class="nm">${p.display_name}</span>${chip("submitted")}</li>`)}
-          </ul>
-          ${count > VISIBLE_ROWS
-            ? html`<div class="scrollhint"><span>Scroll for all ${count}</span><span>↓ ${count - VISIBLE_ROWS} more</span></div>`
-            : ""}`;
+  const panel = dashboardPanel(
+    dash,
+    `/o/${token}/status`,
+    !locked,
+    session.name === null
+      ? "Nobody yet. Name the Session to get an invite link to share."
+      : "Nobody has joined yet. Share the invite link and this table fills itself.",
+  );
 
   const inviteCard = html`<div class="linkcard">
     <div class="hd"><b>Invite link</b><button type="button" hidden data-copy="${invite}">Copy</button></div>
@@ -116,10 +105,7 @@ export const organizerView = async (
       "Organizer",
       html`${header}${messages}
         <div class="cols">
-          <div class="stack">${stats}
-            <p class="label">Participants · ${count}</p>
-            ${peopleList}
-          </div>
+          <div class="stack">${panel}</div>
           <div class="stack">
             ${state === "picking" ? "" : nameForm}
             ${named
@@ -169,6 +155,7 @@ export const organizerView = async (
     "Organizer",
     html`${header}${messages}
       <p class="muted">This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted. The meeting’s over. Hand us the transcript.</p>
+      ${panel}
       <div class="cols">
         <div class="stack"><h2>Jargon Result</h2>${results}
           <a class="btn btn--primary" href="/o/${token}/leaderboard">See the leaderboard</a>

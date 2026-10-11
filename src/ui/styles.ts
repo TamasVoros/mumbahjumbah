@@ -92,6 +92,10 @@ table.t{width:100%;border-collapse:collapse;background:var(--paper);border:var(-
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .stat{background:var(--paper);border:var(--b);border-radius:2px;padding:12px 14px}
 .stat .num{font-size:32px;line-height:1.1}.stat .cap{display:block}
+.tablewrap{max-height:365px;padding-right:0}
+.dash-table .nm{font-weight:600;overflow-wrap:anywhere}.dash-table td.mono,.dash-table th{white-space:nowrap}
+.dash-table th,.dash-table td{padding-inline:14px}.dash-table th:nth-child(n+2),.dash-table td:nth-child(n+2){text-align:right}
+.dash-table[hidden]{display:none}
 .people{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
 .person{flex:none;display:flex;align-items:center;gap:12px;background:var(--paper);border:var(--b);border-radius:2px;padding:0 14px;height:42px;font-size:14px;font-weight:600}
 .person .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -125,7 +129,7 @@ textarea.field{height:96px;resize:vertical}
 /* desktop */
 @media(min-width:960px){
  .titlebar h1{font-size:34px}.stats--3{grid-template-columns:repeat(3,1fr)}.stat .num{font-size:36px}
- .person{height:46px}.people--scroll{max-height:none}
+ .person{height:46px}.tablewrap{max-height:420px}.dash-table th,.dash-table td{padding-inline:20px}.people--scroll{max-height:none}
  .screen{padding:48px 64px}.hero{font-size:68px;line-height:1.02;letter-spacing:-.02em}h1{font-size:36px}
  .cols{display:grid;grid-template-columns:1fr 340px;gap:56px;align-items:start}
  .zigzag{margin-inline:0}

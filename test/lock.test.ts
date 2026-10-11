@@ -26,8 +26,7 @@ describe("Organizer view", () => {
     await submit(s.invite_link_token, "a@x.com", ["one", "two"]);
     await submit(s.invite_link_token, "b@x.com", ["one", "two"]);
     const html = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
-    expect(html).toContain("Participants · 2");
-    expect(html).toContain("<span class=\"num\">2</span><span class=\"cap\">grids in</span>");
+    expect(html).toContain("<span class=\"num\" data-stat=\"participants\">2</span>");
     expect(html).toContain("Lock &amp; Start Session!");
     expect(html).toContain("chip--open");
     expect(html).not.toContain("a@x.com");

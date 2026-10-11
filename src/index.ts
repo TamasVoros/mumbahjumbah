@@ -9,6 +9,7 @@ import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
 import { organizerView } from "./organizer";
+import { getDashboardStatus } from "./dashboard";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
   countParticipants,
@@ -474,6 +475,15 @@ app.get("/o/:token", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
+});
+
+// Live dashboard data, polled by the Organizer page. Organizer token only (invite token 403, unknown 404); names, never emails.
+app.get("/o/:token/status", async (c) => {
+  const token = c.req.param("token");
+  const now = Date.now();
+  const session = await findByOrganizerToken(c.env.DB, token, now);
+  if (!session) return organizerMissing(c, token);
+  return c.json(await getDashboardStatus(c.env.DB, session, now), 200, { "cache-control": "no-store" });
 });
 
 // Only an Organizer Link token can name the Session; editable until lock. Reveals the Invite Link once saved.
