@@ -6,6 +6,7 @@ import archivo400 from "./fonts/archivo-latin-400-normal.woff";
 import archivo800 from "./fonts/archivo-latin-800-normal.woff";
 import anton from "./fonts/anton-latin-400-normal.woff";
 import jetbrainsMono from "./fonts/jetbrains-mono-latin-400-normal.woff";
+import { logoMarkSvg } from "./ui/logo";
 import type { LeaderboardEntry } from "./leaderboard";
 import type { Counted } from "./transcript";
 
@@ -42,13 +43,7 @@ function truncate(s: string, max: number): string {
 }
 
 // Logo mark from DESIGN.md §5 (64x84 viewBox), bone on indigo.
-const LOGO_SVG =
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 84" width="44" height="58">` +
-  `<path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="${BONE}"/>` +
-  `<path d="M12 24L32 12L52 24" fill="none" stroke="${INDIGO}" stroke-width="5"/>` +
-  `<path d="M13 40L28 36L22 48Z" fill="${INDIGO}"/>` +
-  `<path d="M51 40L36 36L42 48Z" fill="${INDIGO}"/>` +
-  `<path d="M32 54L38 64L32 76L26 64Z" fill="${INDIGO}"/></svg>`;
+const LOGO_SVG = logoMarkSvg(BONE, INDIGO, 44, true);
 
 // Zigzag from DESIGN.md §5 (16px tile, 2.5px red stroke) at 2x scale, drawn as one full-width path.
 function zigzagSvg(width: number): string {

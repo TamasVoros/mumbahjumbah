@@ -1,5 +1,5 @@
 import { html, raw } from "hono/html";
-import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
+import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
 
 // Placeholder pricing copied from mockups 6A / D6. Not real pricing (DESIGN.md open items).
 type Plan = {
@@ -84,6 +84,7 @@ export const plansPage = () => html`<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Plans</title>
+    ${brandHead()}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />

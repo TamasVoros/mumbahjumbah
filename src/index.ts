@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { html, raw } from "hono/html";
 import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
-import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
+import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
 import { entryView, lockedView, submittedView, timesUpView, waitingView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
@@ -171,17 +171,32 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outlin
 `;
 
 // Other pages get a plain readable column until they are restyled; the landing page is full-bleed (bare).
-const page = (title: string, content: unknown, bare = false) => {
+const page = (title: string, content: unknown, bare = false, head?: unknown) => {
   const body = bare ? content : html`<main class="plain wrap">${content}</main>`;
-  return shell(title, body);
+  return shell(title, body, head);
 };
 
-const shell = (title: string, body: unknown) => html`<!doctype html>
+const LANDING_TITLE = "MumbahJumbah: Predict the jargon. Win the meeting.";
+const LANDING_DESCRIPTION = "Reverse bingo for meetings. Pick the buzzwords you think will be said, then see who called it.";
+const SOCIAL_HEAD = html`<meta name="description" content="${LANDING_DESCRIPTION}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MumbahJumbah" />
+    <meta property="og:title" content="${LANDING_TITLE}" />
+    <meta property="og:description" content="${LANDING_DESCRIPTION}" />
+    <meta property="og:url" content="https://mumbahjumbah.com/" />
+    <meta property="og:image" content="https://mumbahjumbah.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />`;
+
+const shell = (title: string, body: unknown, head?: unknown) => html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
+    ${brandHead()}
+    ${head ?? ""}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -209,7 +224,7 @@ const PICK_PRESETS = ["5", "10"] as const;
 // Pills are radio inputs, so the form works without JS.
 const createForm = (error?: string) =>
   page(
-    "MumbahJumbah: Predict the jargon. Win the meeting.",
+    LANDING_TITLE,
     html`<header class="hero on-indigo">
         <div class="wrap">
           <div class="container">
@@ -295,6 +310,7 @@ const createForm = (error?: string) =>
         })();
       </script>`,
     true,
+    SOCIAL_HEAD,
   );
 
 app.get("/", (c) => c.html(createForm()));
@@ -344,6 +360,7 @@ const errorPage = (
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
+    ${brandHead()}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;700;800&display=swap" rel="stylesheet" />
@@ -639,6 +656,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Leaderboard</title>
+    ${brandHead()}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />

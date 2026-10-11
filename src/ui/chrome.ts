@@ -1,11 +1,20 @@
 import { html, raw } from "hono/html";
+import { logoMarkSvg } from "./logo";
+import { COLOR as C } from "./tokens";
 
 /**
  * Shared site header + footer (#34). Every page renderer calls siteHeader() right after <body> and
  * siteFooter() right before </body>, and includes CHROME_CSS in its <style>. Colours are literals so
  * the block renders identically regardless of which page stylesheet surrounds it.
  */
-const MARK = `<svg width="18" height="24" viewBox="0 0 64 84" aria-hidden="true"><path d="M32 2C14 2 6 16 6 38c0 24 10 44 26 44s26-20 26-44C58 16 50 2 32 2Z" fill="#F4EFE6"/><path d="M12 24L32 12L52 24" fill="none" stroke="#1F2F63" stroke-width="5"/><path d="M13 40L28 36L22 48Z" fill="#1F2F63"/><path d="M51 40L36 36L42 48Z" fill="#1F2F63"/><path d="M32 54L38 64L32 76L26 64Z" fill="#1F2F63"/></svg>`;
+const MARK = logoMarkSvg(C.bone, C.indigo, 18);
+
+/** Favicon, apple-touch icon, manifest and theme-color (served from public/). Every page head includes this. */
+export const brandHead = () => html`<link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="${C.indigo}" />`;
 
 export const siteHeader = (opts: { organizer?: boolean } = {}) => html`<header class="site-header">
   <div class="site-inner">

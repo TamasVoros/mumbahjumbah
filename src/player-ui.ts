@@ -1,5 +1,5 @@
 import { html, raw } from "hono/html";
-import { CHROME_CSS, siteFooter, siteHeader } from "./ui/chrome";
+import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
 
 // Player-facing invite-link screens, styled per DESIGN.md (direction 2A).
 // Mockups: Desktop D3 (entry), Screens 3B (submitted), 3C (locked).
@@ -107,6 +107,7 @@ const shell = (title: string, status: PlayerStatus, main: unknown, side?: unknow
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${title}</title>
+    ${brandHead()}
     ${fontLink}
     <style>${raw(css)}${raw(CHROME_CSS)}</style>
   </head>
