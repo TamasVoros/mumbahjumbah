@@ -22,6 +22,8 @@
     "dev": {
       "name": "mumbahjumbah-dev",
       "workers_dev": true,
+      // Top-level routes are inherited; without this, deploying dev claims the prod custom domain.
+      "routes": [],
       "alias": { "harfbuzzjs": "./src/harfbuzz-shim.ts", "fs": "./src/empty-shim.ts", "path": "./src/empty-shim.ts" },
       "rules": [{ "type": "Data", "globs": ["**/*.woff"], "fallthrough": true }],
       "observability": { "enabled": true },
