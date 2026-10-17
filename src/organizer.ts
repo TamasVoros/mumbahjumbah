@@ -18,6 +18,10 @@ const UPLOAD_ICON = raw(
   `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 22V6M7 13l7-7 7 7" fill="none" stroke="#1F2F63" stroke-width="3"/></svg>`,
 );
 
+const PENCIL_ICON = raw(
+  `<svg class="pencil" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 17l1-4L14 3l3 3L7 16l-4 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+);
+
 // Progressive enhancement only: without JS the file input, textarea and buttons still post normally.
 const PAGE_JS = `(function(){var f=document.querySelector('[data-upload]');if(f){
 var dz=f.querySelector('.dropzone'),file=f.querySelector('input[type=file]'),name=f.querySelector('[data-file-name]'),text=f.querySelector('textarea'),go=f.querySelector('[data-score]'),def=name.textContent;
@@ -91,8 +95,8 @@ export const organizerView = async (
   const editable = state === "setup" || state === "open";
   const header = editable
     ? html`<div class="titlebar"><form class="titlebar__form" method="post" action="/o/${token}/name" data-name-form>
-        <h1><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
-          aria-label="Session name" placeholder="Name your session" value="${session.name ?? ""}" /></h1>
+        <h1 class="title-wrap"><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
+          aria-label="Session name" placeholder="Name your session" value="${session.name ?? ""}" />${PENCIL_ICON}</h1>
       </form></div>`
     : html`<div class="titlebar"><h1>${session.name ?? ""}</h1></div>`;
 
@@ -112,6 +116,25 @@ export const organizerView = async (
           <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. Participants wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
           <button class="btn btn--secondary" type="submit">Start timer</button>
         </form>`;
+
+  // Stage 1/5: naming is its own screen. Explicit submit (no blur-save); nothing else is rendered.
+  if (state === "setup") {
+    return shell(
+      "Organizer",
+      html`${messages}
+        <form class="name-stage stack" method="post" action="/o/${token}/name">
+          <h1>Name your session</h1>
+          <p class="muted">Name your session. Participants see this on their pages.</p>
+          <div class="stack">
+            <label class="label" for="session-name">Session name</label>
+            <div class="name-field">${PENCIL_ICON}<input id="session-name" class="name-input" name="name" type="text" maxlength="80" required
+              autocomplete="off" autofocus placeholder="e.g. Q3 All-Hands" /></div>
+          </div>
+          <div class="cta-card">${zigzag(true)}<div class="pad"><button class="btn btn--primary" type="submit">Save and continue</button></div></div>
+        </form>`,
+      { strip },
+    );
+  }
 
   if (!locked) {
     return shell(
