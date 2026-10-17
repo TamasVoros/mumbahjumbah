@@ -12,7 +12,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bone);color:var(--ink);font:400 15px/1.5 Archivo,system-ui,-apple-system,"Segoe UI",sans-serif}
 .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
 .head{display:none}
-.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 24px;display:flex;flex-direction:column;gap:24px;min-height:100vh}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 24px;display:flex;flex-direction:column;gap:24px}
 .main{display:flex;flex-direction:column;gap:24px;flex:1;min-width:0}
 .title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 h1{margin:0;font-weight:800;font-size:22px;line-height:1.1}

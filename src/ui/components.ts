@@ -6,7 +6,7 @@ import { logoMarkSvg } from "./logo";
 import { brandHead } from "./chrome";
 
 /** Replaces the bare `page()` in src/index.ts. */
-export const shell = (title: string, body: unknown, opts: { board?: boolean; wide?: boolean; organizer?: boolean } = {}) => html`<!doctype html>
+export const shell = (title: string, body: unknown, opts: { board?: boolean; wide?: boolean } = {}) => html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -16,7 +16,7 @@ export const shell = (title: string, body: unknown, opts: { board?: boolean; wid
     <style>${raw(CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body class="${opts.board ? "board" : ""}">
-    ${siteHeader({ organizer: opts.organizer })}
+    ${siteHeader()}
     <main class="screen ${opts.wide ? "screen--wide" : ""}">${body}</main>
     ${siteFooter()}
   </body>
