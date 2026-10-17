@@ -21,7 +21,7 @@ A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page righ
 _Avoid_: Title, session title (Display Name is the Participant's, not this)
 
 **Pick Timer**:
-A 30-60 second (default 30) countdown the Organizer starts once the Session has a name. States: setup (no name), open (named, timer not started: Participants see a waiting screen), picking (timer running: Participants see the pick form and a synced countdown), locked. The timer ending and **Lock & Start Session!** are the same locked state; Lock & Start works before the timer starts, while it runs (stopping it) and after it ended. Fixed once started (no pause or extend; the name is frozen too). The server enforces it lazily on every request (`now >= timer_ends_at` persists `locked_at = timer_ends_at`); a late submission gets a 409 with the typed picks shown read-only. Strict cutoff, no grace window.
+A 30-60 second (default 30) countdown the Organizer starts once the Session has a name. States: setup (no name), open (named, timer not started: Participants see a waiting screen), picking (timer running: Participants see the pick form and a synced countdown), locked. The timer ending and **Lock & Start Session!** are the same locked state; Lock & Start is offered on the picking screen (organizer stage 3/5) and stops the running timer; the server still accepts an early lock before the timer starts. Fixed once started (no pause or extend; the name is frozen too). The server enforces it lazily on every request (`now >= timer_ends_at` persists `locked_at = timer_ends_at`); a late submission gets a 409 with the typed picks shown read-only. Strict cutoff, no grace window.
 _Avoid_: Countdown (the participant-side display of it), deadline
 
 **Invite Link**:

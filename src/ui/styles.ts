@@ -119,6 +119,8 @@ textarea.field{height:96px;resize:vertical}
 .linkcard button:focus-visible{outline:2px solid var(--indigo)}
 .linkcard button[hidden]{display:none}
 .linkcard .mono{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.tcard{background:var(--paper);border:var(--b);border-radius:2px;padding:20px 22px;min-width:0}
+.duo{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
 .invite{display:flex;flex-direction:column;gap:14px;background:var(--paper);border:var(--b);border-radius:2px;padding:20px 22px;min-width:0}
 .invite h2{font-size:18px}
 .invite__qr{align-self:center;width:100%;max-width:280px;border:var(--b);background:#fff;line-height:0}
@@ -152,6 +154,7 @@ textarea.field{height:96px;resize:vertical}
 .msg{border:var(--b);border-radius:2px;background:var(--paper);padding:10px 14px;font-size:14px}
 .msg[role=alert]{border-color:var(--red);border-left-width:6px}
 .msg[role=status]{border-left:6px solid var(--indigo)}
+@media(min-width:900px){.duo{grid-template-columns:1fr 1fr;gap:24px}}
 /* desktop */
 @media(min-width:960px){
  .titlebar h1{font-size:34px}.stats--3{grid-template-columns:repeat(3,1fr)}.stat .num{font-size:36px}

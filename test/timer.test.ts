@@ -101,14 +101,33 @@ describe("Start timer", () => {
     expect(before).toContain('max="60"');
     expect(before).toContain('value="30"');
     expect(before).toContain("Start timer");
-    expect(before).toContain("Lock &amp; Start Session!");
-    await startTimer(s.organizer_link_token, "40");
+    expect(before).toContain("2/5 · Invite &amp; timer");
+    // Stage 2: invite card + timer form only.
+    expect(before).toContain('id="invite-title"');
+    expect(before).toContain("covers word picking only");
+    for (const gone of ['class="stats', "<table", "data-dash", "Lock &amp; Start", `/o/${s.organizer_link_token}/lock`]) {
+      expect(before).not.toContain(gone);
+    }
+    expect(before.indexOf('id="invite-title"')).toBeLessThan(before.indexOf('name="seconds"'));
+    expect(before).toContain('class="duo"');
+    expect(before).toContain('class="title-input"');
+
+    const started = await startTimer(s.organizer_link_token, "40");
+    const toast = await started.text();
+    expect(toast).toContain("Timer started");
+    expect(toast).toContain("3/5 · Participants");
     const after = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
     expect(after).toContain("Timer running");
     expect(after).toContain('id="org-timer"');
     expect(after).not.toContain('name="seconds"');
     expect(after).toContain("3/5 · Participants");
     expect(after).not.toContain(">PICKING<");
+    // Stage 3 order: invite, running timer, KPIs, table, Lock & Start; name read-only.
+    const order = ['id="invite-title"', 'id="org-timer"', 'class="stats', "<table", "Lock &amp; Start Session!"].map((m) => after.indexOf(m));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(after).not.toContain('class="title-input"');
+    expect(after).toContain('<h1>');
   });
 });
 

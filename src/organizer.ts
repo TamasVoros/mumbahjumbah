@@ -86,8 +86,6 @@ export const organizerView = async (
           <p class="small muted">Show it on screen or paste the QR into your deck. Anyone with this link can join.</p>
         </section>`;
 
-  const named = session.name !== null;
-
   const now = Date.now();
   const state = sessionState(session, now);
   const strip = organizerStrip(organizerStage(state, jargon.length > 0));
@@ -103,17 +101,17 @@ export const organizerView = async (
   // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
   const timerCard =
     state === "picking"
-      ? html`<div class="stack" id="org-timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
+      ? html`<section class="tcard stack" id="org-timer" aria-label="Pick timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
           <p class="label">Timer running</p>
           <p style="font:400 36px/1 Anton,Impact,sans-serif"><span data-secs>${Math.max(0, Math.ceil((Date.parse(session.timer_ends_at ?? "") - now) / 1000))}</span> s</p>
           <div class="progress"><i data-fill style="width:100%"></i></div>
           <p class="small muted">Participants are picking. When it hits zero the Session locks by itself, or lock it sooner below.</p>
-        </div>`
-      : html`<form class="stack" method="post" action="/o/${token}/timer">
+        </section>`
+      : html`<form class="tcard stack" method="post" action="/o/${token}/timer">
           <label class="label" for="timer-seconds">Pick timer (seconds)</label>
           <input class="field" id="timer-seconds" name="seconds" type="number" min="${MIN_TIMER_SECONDS}" max="${MAX_TIMER_SECONDS}" step="1"
             value="${DEFAULT_TIMER_SECONDS}" required inputmode="numeric" />
-          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. Participants wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
+          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. The timer covers word picking only. Participants can already join and enter their name and email; they wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
           <button class="btn btn--secondary" type="submit">Start timer</button>
         </form>`;
 
@@ -136,26 +134,22 @@ export const organizerView = async (
     );
   }
 
+  // Stage 2/5 (open): invite + timer only. Stage 3/5 (picking): the same pair, then KPIs, table and Lock & Start.
   if (!locked) {
+    const lockCard = html`<div class="cta-card">
+      <form method="post" action="/o/${token}/lock">
+        <div class="pad pad--top"><h2>Ready to start?</h2>
+          <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
+        ${zigzag(true)}
+        <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
+      </form>
+    </div>`;
     return shell(
       "Organizer",
       html`${header}${messages}
-        <div class="cols">
-          <div class="stack">${panel}</div>
-          <div class="stack">
-            ${named
-              ? html`${timerCard}
-                  <div class="cta-card">
-                    <form method="post" action="/o/${token}/lock">
-                      <div class="pad pad--top"><h2>Ready to start?</h2>
-                        <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
-                      ${zigzag(true)}
-                      <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
-                    </form>
-                  </div>
-                  ${inviteCard}`
-              : ""}
-          </div>
+        <div class="stack">
+          <div class="duo">${inviteCard}${timerCard}</div>
+          ${state === "picking" ? html`${panel}${lockCard}` : ""}
         </div>
         <script>${raw(PAGE_JS)}</script>
         ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
