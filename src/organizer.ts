@@ -1,7 +1,6 @@
 import { html, raw } from "hono/html";
 import { getDashboardStatus } from "./dashboard";
 import { dashboardPanel } from "./dashboard-ui";
-import { getJargonResult, getPickerCounts } from "./jargon";
 import {
   DEFAULT_TIMER_SECONDS,
   MAX_TIMER_SECONDS,
@@ -10,12 +9,16 @@ import {
   type Session,
 } from "./sessions";
 import { qrSvg } from "./qr";
-import { chip, shell, zigzag } from "./ui/components";
+import { shell, stepStrip, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
 
 const UPLOAD_ICON = raw(
   `<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 22V6M7 13l7-7 7 7" fill="none" stroke="#1F2F63" stroke-width="3"/></svg>`,
+);
+
+const PENCIL_ICON = raw(
+  `<svg class="pencil" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M3 17l1-4L14 3l3 3L7 16l-4 1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
 );
 
 // Progressive enhancement only: without JS the file input, textarea and buttons still post normally.
@@ -45,11 +48,7 @@ export const organizerView = async (
   message?: OrganizerMessage,
 ) => {
   const locked = !!session.locked_at;
-  const [dash, pickerCounts, jargon] = await Promise.all([
-    getDashboardStatus(db, session),
-    getPickerCounts(db, session.id),
-    locked ? getJargonResult(db, session.id) : Promise.resolve([]),
-  ]);
+  const dash = await getDashboardStatus(db, session);
   const invite = `${origin}/i/${session.invite_link_token}`;
 
   // Toast: CSS-only fade (no JS), non-blocking, sits directly below the navbar.
@@ -82,111 +81,103 @@ export const organizerView = async (
           <p class="small muted">Show it on screen or paste the QR into your deck. Anyone with this link can join.</p>
         </section>`;
 
-  const named = session.name !== null;
-
   const now = Date.now();
   const state = sessionState(session, now);
-  const stateChip = { setup: chip("pending", "SETUP"), open: chip("open"), picking: chip("pending", "PICKING"), locked: chip("locked") }[state];
+  const strip = organizerStrip(organizerStage(state, false));
   // Editable while neither picking nor locked: the title is the name field (Enter, or blur with JS, saves).
   const editable = state === "setup" || state === "open";
   const header = editable
     ? html`<div class="titlebar"><form class="titlebar__form" method="post" action="/o/${token}/name" data-name-form>
-        <h1><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
-          aria-label="Session name" placeholder="Name your session" value="${session.name ?? ""}" /></h1>
-      </form>${stateChip}</div>`
-    : html`<div class="titlebar"><h1>${session.name ?? ""}</h1>${stateChip}</div>`;
+        <h1 class="title-wrap"><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
+          aria-label="Session name" placeholder="Name your session" value="${session.name ?? ""}" />${PENCIL_ICON}</h1>
+      </form></div>`
+    : html`<div class="titlebar"><h1>${session.name ?? ""}</h1></div>`;
 
   // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
   const timerCard =
     state === "picking"
-      ? html`<div class="stack" id="org-timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
+      ? html`<section class="tcard stack" id="org-timer" aria-label="Pick timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
           <p class="label">Timer running</p>
           <p style="font:400 36px/1 Anton,Impact,sans-serif"><span data-secs>${Math.max(0, Math.ceil((Date.parse(session.timer_ends_at ?? "") - now) / 1000))}</span> s</p>
           <div class="progress"><i data-fill style="width:100%"></i></div>
           <p class="small muted">Participants are picking. When it hits zero the Session locks by itself, or lock it sooner below.</p>
-        </div>`
-      : html`<form class="stack" method="post" action="/o/${token}/timer">
+        </section>`
+      : html`<form class="tcard stack" method="post" action="/o/${token}/timer">
           <label class="label" for="timer-seconds">Pick timer (seconds)</label>
           <input class="field" id="timer-seconds" name="seconds" type="number" min="${MIN_TIMER_SECONDS}" max="${MAX_TIMER_SECONDS}" step="1"
             value="${DEFAULT_TIMER_SECONDS}" required inputmode="numeric" />
-          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. Participants wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
+          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. The timer covers word picking only. Participants can already join and enter their name and email; they wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
           <button class="btn btn--secondary" type="submit">Start timer</button>
         </form>`;
 
-  if (!locked) {
+  // Stage 1/5: naming is its own screen. Explicit submit (no blur-save); nothing else is rendered.
+  if (state === "setup") {
     return shell(
       "Organizer",
-      html`${header}${messages}
-        <div class="cols">
-          <div class="stack">${panel}</div>
+      html`${messages}
+        <form class="name-stage stack" method="post" action="/o/${token}/name">
+          <h1>Name your session</h1>
+          <p class="muted">Name your session. Participants see this on their pages.</p>
           <div class="stack">
-            ${named
-              ? html`${timerCard}
-                  <div class="cta-card">
-                    <form method="post" action="/o/${token}/lock">
-                      <div class="pad pad--top"><h2>Ready to start?</h2>
-                        <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
-                      ${zigzag(true)}
-                      <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
-                    </form>
-                  </div>
-                  ${inviteCard}`
-              : ""}
+            <label class="label" for="session-name">Session name</label>
+            <div class="name-field">${PENCIL_ICON}<input id="session-name" class="name-input" name="name" type="text" maxlength="80" required
+              autocomplete="off" autofocus placeholder="e.g. Q3 All-Hands" /></div>
           </div>
-        </div>
-        <script>${raw(PAGE_JS)}</script>
-        ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
-      { wide: true },
+          <div class="cta-card">${zigzag(true)}<div class="pad"><button class="btn btn--primary" type="submit">Save and continue</button></div></div>
+        </form>`,
+      { strip },
     );
   }
 
-  const max = Math.max(1, ...jargon.map((j) => j.occurrences));
-  const said = new Set(jargon.map((j) => j.term));
-  const unseen = [...pickerCounts.keys()].filter((t) => !said.has(t)).sort();
-  const rows = [
-    ...jargon.map((j) => ({ term: j.term, n: j.occurrences })),
-    ...(jargon.length ? unseen.map((term) => ({ term, n: 0 })) : []),
-  ];
+  // Stage 2/5 (open): invite + timer only. Stage 3/5 (picking): the same pair, then KPIs, table and Lock & Start.
+  if (!locked) {
+    const lockCard = html`<div class="cta-card">
+      <form method="post" action="/o/${token}/lock">
+        <div class="pad pad--top"><h2>Ready to start?</h2>
+          <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
+        ${zigzag(true)}
+        <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
+      </form>
+    </div>`;
+    return shell(
+      "Organizer",
+      html`${header}${messages}
+        <div class="stack">
+          <div class="duo">${inviteCard}${timerCard}</div>
+          ${state === "picking" ? html`${panel}${lockCard}` : ""}
+        </div>
+        <script>${raw(PAGE_JS)}</script>
+        ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
+      { wide: true, strip },
+    );
+  }
 
-  const results =
-    jargon.length === 0
-      ? html`<p class="small muted">No Jargon Result yet (or no picked term was said).</p>`
-      : html`<div class="stack">
-          <div><p class="label">What the room said</p>
-            <p style="font-size:26px;font-weight:800;line-height:1.1;margin:6px 0 0">${said.size} of your ${pickerCounts.size} picks showed up.</p>
-            <p class="small muted" style="margin-top:6px">Only words someone picked are counted.</p></div>
-          <ul class="words ${rows.length > 8 ? "words--scroll scroll" : ""}" aria-label="Jargon Result">
-            ${rows.map(
-              (r) => html`<li class="word ${r.n === 0 ? "word--zero" : ""}"><i style="width:${Math.round((r.n / max) * 100)}%"></i><span class="t">${r.term}</span><span class="by">${pickerCounts.get(r.term) ?? 0} picked</span><span class="n">×${r.n}</span></li>`,
-            )}
-          </ul>
-          <div class="scrollhint"><span>Most said first</span>${rows.length > 8 ? html`<span>↓ ${rows.length - 8} more</span>` : ""}</div>
-        </div>`;
-
+  // Stage 4/5: locked summary + upload only. Also served when a Jargon Result exists (?step=transcript) to re-score.
+  const n = dash.stats.participants;
   return shell(
     "Organizer",
     html`${header}${messages}
-      <p class="muted">This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted. The meeting’s over. Hand us the transcript.</p>
-      ${panel}
-      <div class="cols">
-        <div class="stack"><h2>Jargon Result</h2>${results}
-          <a class="btn btn--primary" href="/o/${token}/leaderboard">See the leaderboard</a>
-          <p class="small"><a class="lnk" href="/o/${token}/recap.png">Recap Card (PNG)</a></p></div>
-        <div class="stack">
-          <form class="stack" data-upload method="post" action="/o/${token}/transcript" enctype="multipart/form-data">
-            <h2>Upload Transcript</h2>
-            <label class="dropzone">${UPLOAD_ICON}<b data-file-name>Drop a transcript here</b><span class="mono">.TXT · .VTT</span>
-              <input type="file" name="transcript" accept=".txt,.vtt" aria-label="Transcript file (.txt or .vtt)" /></label>
-            <div class="or" aria-hidden="true">OR</div>
-            <textarea class="field" name="transcript_text" placeholder="Paste transcript text…" aria-label="Paste transcript text"></textarea>
-            <p class="stamp">Transcripts are read in memory, then deleted.</p>
-            <p class="small muted">Only counts for words and phrases Participants picked are kept. Uploading again replaces the previous Jargon Result.</p>
-            <div class="cta-card">${zigzag(true)}<div class="pad"><button class="btn btn--secondary" type="submit" data-score>Score the session</button></div></div>
-          </form>
-          ${inviteCard}
-        </div>
-      </div>
+      <p class="muted">Locked at ${session.locked_at} UTC · ${n} ${n === 1 ? "participant" : "participants"}. The meeting’s over. Hand us the transcript.</p>
+      <form class="stack" data-upload method="post" action="/o/${token}/transcript" enctype="multipart/form-data">
+        <h2>Upload Transcript</h2>
+        <label class="dropzone">${UPLOAD_ICON}<b data-file-name>Drop a transcript here</b><span class="mono">.TXT · .VTT</span>
+          <input type="file" name="transcript" accept=".txt,.vtt" aria-label="Transcript file (.txt or .vtt)" /></label>
+        <div class="or" aria-hidden="true">OR</div>
+        <textarea class="field" name="transcript_text" placeholder="Paste transcript text…" aria-label="Paste transcript text"></textarea>
+        <p class="stamp">Transcripts are read in memory, then deleted.</p>
+        <p class="small muted">Only counts for words and phrases Participants picked are kept. Uploading again replaces the previous Jargon Result.</p>
+        <div class="cta-card">${zigzag(true)}<div class="pad"><button class="btn btn--secondary" type="submit" data-score>Score the session</button></div></div>
+      </form>
       <script>${raw(PAGE_JS)}</script>`,
-    { wide: true },
+    { strip },
   );
 };
+
+export const ORGANIZER_STAGES = ["Name", "Invite & timer", "Participants", "Transcript", "Leaderboard"];
+
+/** 1-based organizer stage. A locked Session is at Transcript until a Jargon Result exists, then Leaderboard. */
+export const organizerStage = (state: "setup" | "open" | "picking" | "locked", hasJargonResult: boolean) =>
+  ({ setup: 1, open: 2, picking: 3, locked: hasJargonResult ? 5 : 4 })[state];
+
+export const organizerStrip = (step: number) =>
+  stepStrip({ role: "organizer", step, total: ORGANIZER_STAGES.length, labels: ORGANIZER_STAGES });

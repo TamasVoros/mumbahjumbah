@@ -28,7 +28,8 @@ describe("Organizer view", () => {
     const html = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
     expect(html).toContain("<span class=\"num\" data-stat=\"participants\">2</span>");
     expect(html).toContain("Lock &amp; Start Session!");
-    expect(html).toContain("chip--open");
+    expect(html).toContain("3/5 · Participants");
+    expect(html).not.toContain('class="chip chip--open"');
     expect(html).not.toContain("a@x.com");
     expect(html).toContain(`action="/o/${s.organizer_link_token}/lock"`);
   });
