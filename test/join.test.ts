@@ -37,6 +37,16 @@ describe("Join before the timer (open state)", () => {
     expect(await rows(s.id)).toBe(0);
   });
 
+  // Regression: ISSUE-001 — the waiting page is a POST response, so location.reload() re-posted the join form
+  // when the timer started and showed "Submit between 1 and N picks" with no action from the participant.
+  // Found by /qa on 2026-10-17
+  it("waiting screen leaves via a GET navigation, never a reload that would re-post the join form", async () => {
+    const s = await createWaitingSession(env.DB, 3);
+    const html = await (await post(s.invite_link_token, [["email", "a@x.com"], ["display_name", "Ann"]])).text();
+    expect(html).toContain("location.replace(location.pathname+location.search)");
+    expect(html).not.toContain("location.reload()");
+  });
+
   it("invalid identity: 400 with inline error, no waiting screen, input kept", async () => {
     const s = await createWaitingSession(env.DB, 3);
     const bad = await post(s.invite_link_token, [["email", "nope"], ["display_name", "Ann"]]);
