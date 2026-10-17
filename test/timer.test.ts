@@ -118,7 +118,7 @@ describe("Participants before and during the timer", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("Town hall");
-    expect(html).toContain("Waiting for the organizer to start");
+    expect(html).toContain('name="display_name"');
     expect(html).not.toContain('id="pickapp"');
     expect(await status(s.invite_link_token)).toMatchObject({ state: "open", endsAt: null });
 

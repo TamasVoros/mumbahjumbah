@@ -212,6 +212,23 @@ function poll(){fetch(w.dataset.status,{cache:'no-store'}).then(function(r){retu
 setInterval(poll,3000);
 })();`;
 
+// Identity carried across the open -> picking reload, in localStorage keyed by invite token.
+// Pure enhancement: every storage access is guarded, and the server never reads it.
+const identityScript = `(function(){
+var key='mj:id:'+location.pathname.split('/')[2];
+function get(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
+function put(e,n){try{localStorage.setItem(key,JSON.stringify({email:e,display_name:n}))}catch(x){}}
+var w=document.getElementById('waiting');
+if(w&&w.dataset.email)put(w.dataset.email,w.dataset.name);
+[].forEach.call(document.querySelectorAll('form'),function(f){
+ var e=f.querySelector('input[name=email]'),n=f.querySelector('input[name=display_name]');
+ if(!e||!n)return;
+ var s=get();
+ if(s&&!e.value&&!n.value){e.value=s.email||'';n.value=s.display_name||''}
+ f.addEventListener('submit',function(){if(e.value&&n.value)put(e.value.trim(),n.value.trim())});
+});
+})();`;
+
 export type TimerInfo = { endsAt: number; seconds: number; now: number; statusUrl: string };
 
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
@@ -277,24 +294,58 @@ export const entryView = (
         </div>
       </form>`,
     html`<aside class="side"><div class="label">Your grid</div><div id="sidecount" class="stat">${picks.length} of ${pickCount} picked</div><p class="msg">Editable until the organizer locks the grid.</p></aside>`,
-    timer ? entryScript + timerScript : entryScript,
+    (timer ? entryScript + timerScript : entryScript) + identityScript,
   );
 };
 
-/** Before the Organizer starts the timer: the Session name and a wait message; reloads itself into the pick form on start. */
-export const waitingView = (sessionId: number, statusUrl: string, name?: string | null, notice?: string) =>
+type Identity = { email?: string; display_name?: string };
+
+const identityFields = (v: Identity) => html`<div class="fields">
+    <input type="email" name="email" maxlength="128" value="${v.email ?? ""}" placeholder="Email (e.g. sam@acme.co)" aria-label="Email" autocomplete="email" required />
+    <input type="text" name="display_name" maxlength="50" value="${v.display_name ?? ""}" placeholder="Display name (e.g. Sam)" aria-label="Display name" autocomplete="nickname" required />
+  </div>`;
+
+/**
+ * Before the Organizer starts the timer. Without a valid identity: the join form (Email + Display name; nothing is saved).
+ * With one: the waiting screen greeting the participant, an edit form, and a poll that reloads into the pick form on start.
+ */
+export const waitingView = (
+  sessionId: number,
+  statusUrl: string,
+  name?: string | null,
+  notice?: string,
+  identity?: { email: string; displayName: string },
+  error?: string,
+  values: Identity = {},
+) =>
   shell(
     sessionLabel(sessionId, name),
-    "waiting",
-    html`${titleRow(sessionId, "waiting", name)}
-      ${notice ? html`<p class="alert" role="alert">${notice}</p>` : ""}
-      <div id="waiting" class="panel" data-status="${statusUrl}">
-        <div class="label">GET READY</div>
-        <h2>Waiting for the organizer to start.</h2>
-        <p>The pick form opens here by itself when the timer starts. You will get a short countdown, so have your predictions ready.</p>
-      </div>`,
+    identity ? "waiting" : "open",
+    identity
+      ? html`${titleRow(sessionId, "waiting", name)}
+          ${notice ? html`<p class="alert" role="alert">${notice}</p>` : ""}
+          <div id="waiting" class="panel" data-status="${statusUrl}" data-email="${identity.email}" data-name="${identity.displayName}">
+            <div class="label">YOU’RE IN</div>
+            <h2>You’re in as ${identity.displayName}.</h2>
+            <p>Waiting for the organizer to start. The pick form opens here by itself, with the timer running and your details filled in. Have your predictions ready.</p>
+          </div>
+          <details>
+            <summary>Edit name or email</summary>
+            <form method="post">
+              ${identityFields({ email: identity.email, display_name: identity.displayName })}
+              <button class="btn" type="submit">Update</button>
+            </form>
+          </details>`
+      : html`${titleRow(sessionId, "open", name)}
+          <p class="sub">Join now, pick when the organizer starts the timer. The timer covers picking only.</p>
+          ${notice ? html`<p class="alert" role="alert">${notice}</p>` : ""}
+          ${error ? html`<p class="alert" role="alert">${error}</p>` : ""}
+          <form method="post" id="join">
+            ${identityFields(values)}
+            <button class="btn cta" type="submit">Join</button>
+          </form>`,
     undefined,
-    waitingScript,
+    (identity ? waitingScript : "") + identityScript,
   );
 
 /**

@@ -111,8 +111,8 @@ describe("Session Name gates the Invite Link", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("<h1>Standup</h1>");
-    // Named but the timer isn't running yet: participants wait, no pick form.
-    expect(body).toContain('id="waiting"');
+    // Named but the timer isn't running yet: participants join (identity form), no pick form.
+    expect(body).toContain('name="display_name"');
     expect(body).not.toContain('id="pickapp"');
     await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/timer`, { method: "POST" });
     expect(await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}`)).text()).toContain('id="pickapp"');

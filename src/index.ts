@@ -3,7 +3,7 @@ import { html, raw } from "hono/html";
 import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
 import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
-import { saveGrid, validateGrid } from "./grids";
+import { saveGrid, validateGrid, validateIdentity } from "./grids";
 import { entryView, lockedView, submittedView, timesUpView, waitingView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
@@ -444,10 +444,23 @@ app.post("/i/:token", async (c) => {
   if (!session) return c.html(notFoundPage(), 404);
   const state = sessionState(session, now);
   if (state === "setup") return c.html(notOpenYetPage(), 403);
-  if (state === "open") {
-    return c.html(waitingView(session.id, statusUrl(session), session.name, "The organizer hasn’t started the timer yet, so nothing was saved."), 409);
-  }
   const raw = await c.req.parseBody({ all: true });
+  const str = (k: string) => (typeof raw[k] === "string" ? (raw[k] as string) : "");
+  const typed = { email: str("email"), display_name: str("display_name") };
+  if (state === "open") {
+    // Join step: validate identity only. Nothing is persisted until picks are submitted while the timer runs.
+    const identity = validateIdentity(raw);
+    if (pickedWords(raw).length > 0) {
+      return c.html(
+        waitingView(session.id, statusUrl(session), session.name, "The organizer hasn’t started the timer yet, so nothing was saved.", identity.ok ? identity.value : undefined, undefined, typed),
+        409,
+      );
+    }
+    if (!identity.ok) {
+      return c.html(waitingView(session.id, statusUrl(session), session.name, undefined, undefined, identity.error, typed), 400);
+    }
+    return c.html(waitingView(session.id, statusUrl(session), session.name, undefined, identity.value));
+  }
   // Strict cutoff: after lock or timer end the submission is rejected before validation, and what was typed is shown back read-only.
   if (state === "locked") {
     return c.html(timesUpView(session.id, session.invite_link_token, pickedWords(raw), session.name), 409);
