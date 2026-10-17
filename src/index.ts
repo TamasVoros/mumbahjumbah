@@ -4,11 +4,11 @@ import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
 import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
-import { entryView, lockedView, submittedView, timesUpView, waitingView } from "./player-ui";
+import { entryView, lockedView, playerStrip, submittedView, timesUpView, waitingView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
 import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
-import { organizerView } from "./organizer";
+import { organizerStrip, organizerView } from "./organizer";
 import { qrSvg } from "./qr";
 import { getDashboardStatus } from "./dashboard";
 import { getJargonResult, processTranscript } from "./jargon";
@@ -663,7 +663,8 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
     <style>${raw(LEADERBOARD_CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
-    ${siteHeader({ organizer })}
+    ${siteHeader()}
+    ${organizer ? organizerStrip(5) : playerStrip(4)}
     <main class="lb-page">
       <section class="lb-jargon" aria-labelledby="jargon-h">
         <div class="mono">Results · Jargon</div>

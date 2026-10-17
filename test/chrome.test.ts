@@ -10,7 +10,8 @@ const lock = (token: string) => SELF.fetch(`${base}/o/${token}/lock`, { method: 
 const expectChrome = (body: string, organizer = false) => {
   expect(body).toContain('<header class="site-header">');
   expect(body).toMatch(/<a class="site-brand" href="\/">/);
-  expect(body.includes('class="site-chip">Organizer<')).toBe(organizer);
+  expect(body).not.toContain("site-chip");
+  expect(body.includes('class="step-strip step-strip--organizer"')).toBe(organizer);
   expect(body).toContain('<footer class="site-footer">');
   expect(body).toContain('href="/plans">See plans</a>');
   expect(body).toContain('href="/#privacy">Privacy</a>');
@@ -56,7 +57,7 @@ describe("shared header and footer on every screen", () => {
     expectChrome(await res.text());
   });
 
-  it("organizer: unlocked, locked and leaderboard all show the Organizer chip", async () => {
+  it("organizer: unlocked, locked and leaderboard all show the Organizer step strip", async () => {
     const s = await createSession(env.DB, 2);
     const o = s.organizer_link_token;
     expectChrome(await (await get(`/o/${o}`)).text(), true);

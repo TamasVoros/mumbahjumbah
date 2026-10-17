@@ -48,7 +48,7 @@ describe("invite-link screens follow DESIGN.md", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("sam@acme.co");
-    expect(html).toContain("submitted");
+    expect(html).not.toContain('class="chip submitted"');
     expect(html).toContain('<li class="pill">synergy</li>');
     expect(html).toContain("YOUR PICKS · 2 / 2");
     expect(html).toContain("Edit your Grid");

@@ -107,7 +107,8 @@ describe("Start timer", () => {
     expect(after).toContain("Timer running");
     expect(after).toContain('id="org-timer"');
     expect(after).not.toContain('name="seconds"');
-    expect(after).toContain("PICKING");
+    expect(after).toContain("3/5 · Participants");
+    expect(after).not.toContain(">PICKING<");
   });
 });
 

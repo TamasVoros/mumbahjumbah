@@ -10,7 +10,7 @@ import {
   type Session,
 } from "./sessions";
 import { qrSvg } from "./qr";
-import { chip, shell, zigzag } from "./ui/components";
+import { shell, stepStrip, zigzag } from "./ui/components";
 
 export type OrganizerMessage = { error?: string; ok?: string };
 
@@ -86,15 +86,15 @@ export const organizerView = async (
 
   const now = Date.now();
   const state = sessionState(session, now);
-  const stateChip = { setup: chip("pending", "SETUP"), open: chip("open"), picking: chip("pending", "PICKING"), locked: chip("locked") }[state];
+  const strip = organizerStrip(organizerStage(state, jargon.length > 0));
   // Editable while neither picking nor locked: the title is the name field (Enter, or blur with JS, saves).
   const editable = state === "setup" || state === "open";
   const header = editable
     ? html`<div class="titlebar"><form class="titlebar__form" method="post" action="/o/${token}/name" data-name-form>
         <h1><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
           aria-label="Session name" placeholder="Name your session" value="${session.name ?? ""}" /></h1>
-      </form>${stateChip}</div>`
-    : html`<div class="titlebar"><h1>${session.name ?? ""}</h1>${stateChip}</div>`;
+      </form></div>`
+    : html`<div class="titlebar"><h1>${session.name ?? ""}</h1></div>`;
 
   // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
   const timerCard =
@@ -136,7 +136,7 @@ export const organizerView = async (
         </div>
         <script>${raw(PAGE_JS)}</script>
         ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
-      { wide: true, organizer: true },
+      { wide: true, strip },
     );
   }
 
@@ -187,6 +187,15 @@ export const organizerView = async (
         </div>
       </div>
       <script>${raw(PAGE_JS)}</script>`,
-    { wide: true, organizer: true },
+    { wide: true, strip },
   );
 };
+
+export const ORGANIZER_STAGES = ["Name", "Invite & timer", "Participants", "Transcript", "Leaderboard"];
+
+/** 1-based organizer stage. A locked Session is at Transcript until a Jargon Result exists, then Leaderboard. */
+export const organizerStage = (state: "setup" | "open" | "picking" | "locked", hasJargonResult: boolean) =>
+  ({ setup: 1, open: 2, picking: 3, locked: hasJargonResult ? 5 : 4 })[state];
+
+export const organizerStrip = (step: number) =>
+  stepStrip({ role: "organizer", step, total: ORGANIZER_STAGES.length, labels: ORGANIZER_STAGES });
