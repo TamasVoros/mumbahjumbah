@@ -136,7 +136,7 @@ export const organizerView = async (
         </div>
         <script>${raw(PAGE_JS)}</script>
         ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
-      { wide: true, organizer: true },
+      { wide: true },
     );
   }
 
@@ -187,6 +187,6 @@ export const organizerView = async (
         </div>
       </div>
       <script>${raw(PAGE_JS)}</script>`,
-    { wide: true, organizer: true },
+    { wide: true },
   );
 };

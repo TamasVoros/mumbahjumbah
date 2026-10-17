@@ -595,7 +595,7 @@ const LEADERBOARD_CSS = `
 body{margin:0;background:#F4EFE6;color:#17140F;font:400 15px/1.5 Archivo,system-ui,sans-serif}
 a{color:#1F2F63}a:hover{color:#8F2B22}
 a:focus-visible{outline:none;border-radius:2px;box-shadow:0 0 0 1.5px #1F2F63,0 0 0 4.5px rgba(31,47,99,.12)}
-.lb-page{display:flex;flex-direction:column;min-height:100vh}
+.lb-page{display:flex;flex-direction:column}
 .lb-jargon,.lb-board{padding:32px 24px;min-width:0}
 .lb-board{background:#1F2F63;color:#F4EFE6}
 .mono{font:400 11px/1.4 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#5F5648}
@@ -663,7 +663,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
     <style>${raw(LEADERBOARD_CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
-    ${siteHeader({ organizer })}
+    ${siteHeader()}
     <main class="lb-page">
       <section class="lb-jargon" aria-labelledby="jargon-h">
         <div class="mono">Results · Jargon</div>

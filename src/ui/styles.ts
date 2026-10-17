@@ -59,7 +59,7 @@ h1{font-size:28px}h2{font-size:22px}
 .pill button{all:unset;cursor:pointer;width:18px;height:18px;border-radius:99px;background:rgba(244,239,230,.2);display:inline-flex;align-items:center;justify-content:center;font-size:12px;position:relative}
 .pill button::after{content:"";position:absolute;inset:-13px} /* 44px hit area */
 /* leaderboard (indigo ground) */
-.board{background:var(--indigo);color:var(--bone);min-height:100vh}
+.board{background:var(--indigo);color:var(--bone)}
 .winner{background:var(--raffia);color:var(--ink);border-radius:2px;padding:14px 16px;display:flex;align-items:center;gap:14px}
 .winner .num:first-child{font-size:56px}.winner .num:last-child{font-size:44px}
 .row{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;border:1.5px solid var(--indigo-line);background:var(--night);border-radius:2px;padding:0 14px;height:38px}
