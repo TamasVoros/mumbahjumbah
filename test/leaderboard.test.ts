@@ -141,7 +141,14 @@ describe("leaderboard routes", () => {
     const s = await setup();
     const inv = await SELF.fetch(`https://example.com/i/${s.invite_link_token}`);
     expect(await inv.text()).toContain(`/i/${s.invite_link_token}/leaderboard`);
-    const org = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`);
-    expect(await org.text()).toContain(`/o/${s.organizer_link_token}/leaderboard`);
+    // Locked but unscored: the Organizer is on the upload stage. Once scored, the page redirects to the leaderboard.
+    const unscored = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`, { redirect: "manual" });
+    expect(unscored.status).toBe(200);
+    const form = new FormData();
+    form.set("transcript", new File(["ai"], "t.txt"));
+    await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/transcript`, { method: "POST", body: form });
+    const org = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`, { redirect: "manual" });
+    expect(org.status).toBe(303);
+    expect(org.headers.get("location")).toBe(`/o/${s.organizer_link_token}/leaderboard`);
   });
 });

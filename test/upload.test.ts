@@ -45,10 +45,64 @@ describe("Transcript upload", () => {
     expect(res.status).toBe(200);
     expect(await result(s.id)).toEqual({ ai: 2, synergy: 1, "move the needle": 1 });
     const page = await res.text();
-    expect(page).toContain("Jargon Result");
-    expect(page).toContain('<span class="t">ai</span><span class="by">2 picked</span><span class="n">×2</span>');
-    expect(page).toContain("width:100%");
+    expect(page).toContain("What was actually said");
+    expect(page).toContain('<li class="top" style="--w:100%"><b>ai</b>');
     expect(page).not.toContain("unpicked");
+  });
+
+  it("redirects a successful upload (303) to the leaderboard: strip 5/5, toast, recap and re-upload links", async () => {
+    const s = await lockedSession([["alpha", "beta"]]);
+    const res = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/transcript`, {
+      method: "POST",
+      body: (() => { const f = new FormData(); f.set("transcript", new File(["alpha"], "t.txt")); return f; })(),
+      redirect: "manual",
+    });
+    expect(res.status).toBe(303);
+    const loc = res.headers.get("location")!;
+    expect(loc.startsWith(`/o/${s.organizer_link_token}/leaderboard`)).toBe(true);
+    const page = await (await SELF.fetch(`https://example.com${loc}`)).text();
+    expect(page).toContain("5/5");
+    expect(page).toContain("Transcript processed and discarded. Jargon Result updated.");
+    expect(page).toContain(`/o/${s.organizer_link_token}/recap.png`);
+    expect(page).toContain(`href="/o/${s.organizer_link_token}?step=transcript"`);
+    expect(page).toContain("Upload a different transcript");
+    // Plain leaderboard visit: no toast. Invite-side leaderboard has no organizer actions.
+    const plain = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/leaderboard`)).text();
+    expect(plain).not.toContain("Transcript processed and discarded");
+    const inv = await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}/leaderboard`)).text();
+    expect(inv).not.toContain("Upload a different transcript");
+  });
+
+  it("stage 4 (locked, no result) shows only summary + upload; ?step=transcript reopens it for re-scoring", async () => {
+    const s = await lockedSession([["alpha", "beta"]]);
+    const page = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
+    expect(page).toContain("4/5");
+    expect(page).toContain("Locked at");
+    expect(page).toContain("1 participant");
+    expect(page).toContain("Score the session");
+    expect(page).not.toContain("Invite link");
+    expect(page).not.toContain("What the room said");
+    await upload(s.organizer_link_token, "a.txt", "alpha alpha");
+    const again = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}?step=transcript`, { redirect: "manual" });
+    expect(again.status).toBe(200);
+    const html = await again.text();
+    expect(html).toContain("4/5");
+    expect(html).toContain("Score the session");
+    await upload(s.organizer_link_token, "b.txt", "beta");
+    expect(await result(s.id)).toEqual({ beta: 1 });
+    const lb = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/leaderboard`)).text();
+    expect(lb).toContain("<b>beta</b>");
+    expect(lb).not.toContain("<b>alpha</b>");
+  });
+
+  it("a failed upload stays on stage 4 with an error toast", async () => {
+    const s = await lockedSession([["alpha", "beta"]]);
+    const res = await upload(s.organizer_link_token, "empty.txt", "  ");
+    expect(res.status).toBe(400);
+    const page = await res.text();
+    expect(page).toContain('role="alert"');
+    expect(page).toContain("4/5");
+    expect(page).toContain("Score the session");
   });
 
   it("accepts pasted transcript text, preferring a chosen file", async () => {
@@ -75,11 +129,9 @@ describe("Transcript upload", () => {
     expect(before).not.toContain(".SRT");
     expect(before).toContain("Score the session");
     expect(before).toContain("Transcripts are read in memory, then deleted.");
-    expect(before).toContain("No Jargon Result yet");
     const page = await (await upload(s.organizer_link_token, "t.txt", "alpha alpha alpha beta")).text();
-    expect(page).toContain("2 of your 2 picks showed up.");
-    expect(page).toContain("width:33%");
-    expect((await (await upload(s.organizer_link_token, "t.txt", "alpha")).text())).toContain("word--zero");
+    expect(page).toContain("<b>alpha</b>");
+    expect(page).toContain("<b>beta</b>");
   });
 
   it("strips VTT structure before matching", async () => {

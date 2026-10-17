@@ -492,6 +492,10 @@ app.get("/o/:token", async (c) => {
   const token = c.req.param("token");
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
+  // A scored Session lives on the leaderboard (stage 5); ?step=transcript reopens stage 4 to re-score.
+  if (session.locked_at && c.req.query("step") !== "transcript" && (await getJargonResult(c.env.DB, session.id)).length > 0) {
+    return c.redirect(`/o/${token}/leaderboard`, 303);
+  }
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
 });
 
@@ -587,7 +591,7 @@ app.post("/o/:token/transcript", async (c) => {
   }
   const res = await processTranscript(c.env.DB, session.id, file);
   if (!res.ok) return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin, { error: res.error }), 400);
-  return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin, { ok: "Transcript processed and discarded. Jargon Result updated." }));
+  return c.redirect(`/o/${token}/leaderboard?scored=1`, 303);
 });
 
 const LEADERBOARD_CSS = `
@@ -632,6 +636,11 @@ h1{font-size:26px}h2{font-size:22px}
 .winner .sc-c{font-size:44px;line-height:1}
 .recap{display:inline-flex;align-items:center;min-height:44px;margin-top:20px;padding:0 18px;border:1.5px solid #F4EFE6;border-radius:2px;font-weight:700;text-decoration:none}
 .sr{position:absolute;left:-9999px}
+.lb-toast{position:relative;z-index:10}
+.toast{position:absolute;top:0;left:0;right:0;margin:0;border:1.5px solid #17140F;border-radius:2px;background:#F4EFE6;color:#17140F;padding:10px 14px;font-size:14px;pointer-events:none;animation:toast-fade 6s ease-out forwards}
+.toast[role=status]{border-left:6px solid #1F2F63}
+@keyframes toast-fade{0%,66%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-6px);visibility:hidden}}
+@media(prefers-reduced-motion:reduce){.toast{animation-name:toast-fade-rm}@keyframes toast-fade-rm{0%,66%{opacity:1}100%{opacity:0;visibility:hidden}}}
 @media(min-width:900px){
 .lb-page{flex-direction:row}
 .lb-jargon{flex:1;padding:64px}
@@ -646,7 +655,9 @@ a:focus-visible{box-shadow:0 0 0 1.5px #1F2F63,0 0 0 5.5px rgba(31,47,99,.12)}
 }
 `;
 
-const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer = false) => {
+const SCORED_TOAST = "Transcript processed and discarded. Jargon Result updated.";
+
+const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer?: { token: string; scored: boolean }) => {
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   const maxWord = Math.max(1, ...jargon.map((j) => j.occurrences));
   const topScore = Math.max(1, ...board.map((e) => e.score));
@@ -665,6 +676,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
   <body>
     ${siteHeader()}
     ${organizer ? organizerStrip(5) : playerStrip(4)}
+    <div class="lb-toast">${organizer?.scored ? html`<p class="toast" role="status">${SCORED_TOAST}</p>` : ""}</div>
     <main class="lb-page">
       <section class="lb-jargon" aria-labelledby="jargon-h">
         <div class="mono">Results · Jargon</div>
@@ -693,6 +705,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
               </tbody>
             </table>`}
         <a id="recap-link" class="recap" href="${recapUrl}">Recap Card (shareable PNG)</a>
+        ${organizer ? html`<p class="small"><a id="rescore-link" href="/o/${organizer.token}?step=transcript">Upload a different transcript</a></p>` : ""}
       </section>
     </main>
     ${siteFooter()}
@@ -716,7 +729,7 @@ app.get("/o/:token/leaderboard", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   if (!session.locked_at) return c.html(notLocked(), 409);
-  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`, true));
+  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`, { token, scored: c.req.query("scored") === "1" }));
 });
 
 const recap = async (db: D1Database, session: Session) => {

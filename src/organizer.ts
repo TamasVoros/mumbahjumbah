@@ -1,7 +1,6 @@
 import { html, raw } from "hono/html";
 import { getDashboardStatus } from "./dashboard";
 import { dashboardPanel } from "./dashboard-ui";
-import { getJargonResult, getPickerCounts } from "./jargon";
 import {
   DEFAULT_TIMER_SECONDS,
   MAX_TIMER_SECONDS,
@@ -49,11 +48,7 @@ export const organizerView = async (
   message?: OrganizerMessage,
 ) => {
   const locked = !!session.locked_at;
-  const [dash, pickerCounts, jargon] = await Promise.all([
-    getDashboardStatus(db, session),
-    getPickerCounts(db, session.id),
-    locked ? getJargonResult(db, session.id) : Promise.resolve([]),
-  ]);
+  const dash = await getDashboardStatus(db, session);
   const invite = `${origin}/i/${session.invite_link_token}`;
 
   // Toast: CSS-only fade (no JS), non-blocking, sits directly below the navbar.
@@ -88,7 +83,7 @@ export const organizerView = async (
 
   const now = Date.now();
   const state = sessionState(session, now);
-  const strip = organizerStrip(organizerStage(state, jargon.length > 0));
+  const strip = organizerStrip(organizerStage(state, false));
   // Editable while neither picking nor locked: the title is the name field (Enter, or blur with JS, saves).
   const editable = state === "setup" || state === "open";
   const header = editable
@@ -157,54 +152,24 @@ export const organizerView = async (
     );
   }
 
-  const max = Math.max(1, ...jargon.map((j) => j.occurrences));
-  const said = new Set(jargon.map((j) => j.term));
-  const unseen = [...pickerCounts.keys()].filter((t) => !said.has(t)).sort();
-  const rows = [
-    ...jargon.map((j) => ({ term: j.term, n: j.occurrences })),
-    ...(jargon.length ? unseen.map((term) => ({ term, n: 0 })) : []),
-  ];
-
-  const results =
-    jargon.length === 0
-      ? html`<p class="small muted">No Jargon Result yet (or no picked term was said).</p>`
-      : html`<div class="stack">
-          <div><p class="label">What the room said</p>
-            <p style="font-size:26px;font-weight:800;line-height:1.1;margin:6px 0 0">${said.size} of your ${pickerCounts.size} picks showed up.</p>
-            <p class="small muted" style="margin-top:6px">Only words someone picked are counted.</p></div>
-          <ul class="words ${rows.length > 8 ? "words--scroll scroll" : ""}" aria-label="Jargon Result">
-            ${rows.map(
-              (r) => html`<li class="word ${r.n === 0 ? "word--zero" : ""}"><i style="width:${Math.round((r.n / max) * 100)}%"></i><span class="t">${r.term}</span><span class="by">${pickerCounts.get(r.term) ?? 0} picked</span><span class="n">×${r.n}</span></li>`,
-            )}
-          </ul>
-          <div class="scrollhint"><span>Most said first</span>${rows.length > 8 ? html`<span>↓ ${rows.length - 8} more</span>` : ""}</div>
-        </div>`;
-
+  // Stage 4/5: locked summary + upload only. Also served when a Jargon Result exists (?step=transcript) to re-score.
+  const n = dash.stats.participants;
   return shell(
     "Organizer",
     html`${header}${messages}
-      <p class="muted">This Session is locked (since ${session.locked_at} UTC). No further Grids are accepted. The meeting’s over. Hand us the transcript.</p>
-      ${panel}
-      <div class="cols">
-        <div class="stack"><h2>Jargon Result</h2>${results}
-          <a class="btn btn--primary" href="/o/${token}/leaderboard">See the leaderboard</a>
-          <p class="small"><a class="lnk" href="/o/${token}/recap.png">Recap Card (PNG)</a></p></div>
-        <div class="stack">
-          <form class="stack" data-upload method="post" action="/o/${token}/transcript" enctype="multipart/form-data">
-            <h2>Upload Transcript</h2>
-            <label class="dropzone">${UPLOAD_ICON}<b data-file-name>Drop a transcript here</b><span class="mono">.TXT · .VTT</span>
-              <input type="file" name="transcript" accept=".txt,.vtt" aria-label="Transcript file (.txt or .vtt)" /></label>
-            <div class="or" aria-hidden="true">OR</div>
-            <textarea class="field" name="transcript_text" placeholder="Paste transcript text…" aria-label="Paste transcript text"></textarea>
-            <p class="stamp">Transcripts are read in memory, then deleted.</p>
-            <p class="small muted">Only counts for words and phrases Participants picked are kept. Uploading again replaces the previous Jargon Result.</p>
-            <div class="cta-card">${zigzag(true)}<div class="pad"><button class="btn btn--secondary" type="submit" data-score>Score the session</button></div></div>
-          </form>
-          ${inviteCard}
-        </div>
-      </div>
+      <p class="muted">Locked at ${session.locked_at} UTC · ${n} ${n === 1 ? "participant" : "participants"}. The meeting’s over. Hand us the transcript.</p>
+      <form class="stack" data-upload method="post" action="/o/${token}/transcript" enctype="multipart/form-data">
+        <h2>Upload Transcript</h2>
+        <label class="dropzone">${UPLOAD_ICON}<b data-file-name>Drop a transcript here</b><span class="mono">.TXT · .VTT</span>
+          <input type="file" name="transcript" accept=".txt,.vtt" aria-label="Transcript file (.txt or .vtt)" /></label>
+        <div class="or" aria-hidden="true">OR</div>
+        <textarea class="field" name="transcript_text" placeholder="Paste transcript text…" aria-label="Paste transcript text"></textarea>
+        <p class="stamp">Transcripts are read in memory, then deleted.</p>
+        <p class="small muted">Only counts for words and phrases Participants picked are kept. Uploading again replaces the previous Jargon Result.</p>
+        <div class="cta-card">${zigzag(true)}<div class="pad"><button class="btn btn--secondary" type="submit" data-score>Score the session</button></div></div>
+      </form>
       <script>${raw(PAGE_JS)}</script>`,
-    { wide: true, strip },
+    { strip },
   );
 };
 

@@ -232,7 +232,7 @@ describe("Timer end locks the Session (lazy, server-enforced)", () => {
     await startTimer(s.organizer_link_token, "30");
     vi.setSystemTime(T0 + 31_000);
     const page = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
-    expect(page).toContain("This Session is locked");
+    expect(page).toContain("Locked at");
     expect(page).not.toContain("Timer running");
     expect((await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/leaderboard`)).status).toBe(200);
     expect((await row(s.id))!.locked_at).toBe("2026-03-01T12:00:30.000Z");
