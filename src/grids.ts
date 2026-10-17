@@ -18,11 +18,10 @@ export const MAX_PICK_WORDS = 12;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Validates a raw submission against a Session's Pick Count (a maximum: 1..pickCount picks). Duplicates are rejected, never deduped. */
-export function validateGrid(
-  raw: { email?: unknown; display_name?: unknown; pick?: unknown },
-  pickCount: number,
-): GridResult {
+export type IdentityResult = { ok: true; value: { email: string; displayName: string } } | { ok: false; error: string };
+
+/** Email + Display name checks, shared by the pre-timer join step and the full Grid submission. */
+export function validateIdentity(raw: { email?: unknown; display_name?: unknown }): IdentityResult {
   const email = typeof raw.email === "string" ? normalizeEmail(raw.email) : "";
   if (email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) return { ok: false, error: "Enter a valid email address." };
 
@@ -31,6 +30,17 @@ export function validateGrid(
   if (displayName.length > MAX_DISPLAY_NAME_LENGTH) {
     return { ok: false, error: `Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or fewer.` };
   }
+  return { ok: true, value: { email, displayName } };
+}
+
+/** Validates a raw submission against a Session's Pick Count (a maximum: 1..pickCount picks). Duplicates are rejected, never deduped. */
+export function validateGrid(
+  raw: { email?: unknown; display_name?: unknown; pick?: unknown },
+  pickCount: number,
+): GridResult {
+  const identity = validateIdentity(raw);
+  if (!identity.ok) return identity;
+  const { email, displayName } = identity.value;
 
   const rawPicks = (Array.isArray(raw.pick) ? raw.pick : raw.pick === undefined ? [] : [raw.pick]).filter(
     (p): p is string => typeof p === "string",
