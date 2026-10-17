@@ -207,7 +207,7 @@ tick();setInterval(tick,250);setInterval(poll,4000);
 const waitingScript = `(function(){
 var w=document.getElementById('waiting');if(!w)return;
 function poll(){fetch(w.dataset.status,{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
- if(j.state!=='open')location.reload();
+ if(j.state!=='open')location.replace(location.pathname+location.search);
 }).catch(function(){})}
 setInterval(poll,3000);
 })();`;
