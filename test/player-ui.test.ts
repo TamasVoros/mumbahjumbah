@@ -65,13 +65,13 @@ describe("invite-link screens follow DESIGN.md", () => {
     expect(html).toContain("/leaderboard");
   });
 
-  it("late submit: 409 time's-up view that keeps the typed picks read-only", async () => {
+  it("late submit: 409 locked view that keeps the typed picks read-only", async () => {
     const s = await createSession(env.DB, 2);
     await lockSession(env.DB, s.organizer_link_token);
     const res = await post(s.invite_link_token, ["alpha", "beta"]);
     expect(res.status).toBe(409);
     const html = await res.text();
-    expect(html).toContain("Time’s up");
+    expect(html).toContain("The Session is locked");
     expect(html).toContain("WAITING FOR TRANSCRIPT");
     expect(html).toContain("alpha");
     expect(html).toContain("beta");

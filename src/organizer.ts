@@ -1,13 +1,7 @@
 import { html, raw } from "hono/html";
 import { getDashboardStatus } from "./dashboard";
 import { dashboardPanel } from "./dashboard-ui";
-import {
-  DEFAULT_TIMER_SECONDS,
-  MAX_TIMER_SECONDS,
-  MIN_TIMER_SECONDS,
-  sessionState,
-  type Session,
-} from "./sessions";
+import { sessionState, type Session } from "./sessions";
 import { qrSvg } from "./qr";
 import { shell, stepStrip, zigzag } from "./ui/components";
 
@@ -32,13 +26,6 @@ file.addEventListener('change',sync);text.addEventListener('input',sync);sync()}
 var nf=document.querySelector('[data-name-form]');if(nf){var ni=nf.elements.name,nv=ni.value;
 ni.addEventListener('blur',function(){var v=ni.value.trim();if(v&&v!==nv.trim()){nv=ni.value;nf.requestSubmit?nf.requestSubmit():nf.submit()}})}
 [].forEach.call(document.querySelectorAll('[data-copy]'),function(b){if(!navigator.clipboard)return;b.hidden=false;b.addEventListener('click',function(){navigator.clipboard.writeText(b.dataset.copy).then(function(){b.textContent='Copied'})})})})();`;
-
-// Organizer countdown (server-time offset); reloads at zero so the page shows the locked state the server now holds.
-const TIMER_JS = `(function(){var t=document.getElementById('org-timer');if(!t)return;
-var ends=+t.dataset.ends,total=+t.dataset.total*1000,off=+t.dataset.now-Date.now(),s=t.querySelector('[data-secs]'),f=t.querySelector('[data-fill]');
-function tick(){var l=ends-(Date.now()+off);if(l<=0){s.textContent='0';f.style.width='0';location.reload();return}
-s.textContent=Math.ceil(l/1000);f.style.width=Math.min(100,l/total*100)+'%';setTimeout(tick,250)}
-tick()})();`;
 
 export const organizerView = async (
   db: D1Database,
@@ -81,11 +68,10 @@ export const organizerView = async (
           <p class="small muted">Show it on screen or paste the QR into your deck. Anyone with this link can join.</p>
         </section>`;
 
-  const now = Date.now();
-  const state = sessionState(session, now);
+  const state = sessionState(session);
   const strip = organizerStrip(organizerStage(state, false));
-  // Editable while neither picking nor locked: the title is the name field (Enter, or blur with JS, saves).
-  const editable = state === "setup" || state === "open";
+  // Editable until locked: the title is the name field (Enter, or blur with JS, saves).
+  const editable = state !== "locked";
   const header = editable
     ? html`<div class="titlebar"><form class="titlebar__form" method="post" action="/o/${token}/name" data-name-form>
         <h1 class="title-wrap"><input class="title-input" name="name" type="text" maxlength="80" required autocomplete="off"
@@ -93,24 +79,7 @@ export const organizerView = async (
       </form></div>`
     : html`<div class="titlebar"><h1>${session.name ?? ""}</h1></div>`;
 
-  // Name is fixed once the timer starts; the timer length is fixed once started and there is no pause or extend.
-  const timerCard =
-    state === "picking"
-      ? html`<section class="tcard stack" id="org-timer" aria-label="Pick timer" data-ends="${Date.parse(session.timer_ends_at ?? "")}" data-now="${now}" data-total="${session.timer_seconds}">
-          <p class="label">Timer running</p>
-          <p style="font:400 36px/1 Anton,Impact,sans-serif"><span data-secs>${Math.max(0, Math.ceil((Date.parse(session.timer_ends_at ?? "") - now) / 1000))}</span> s</p>
-          <div class="progress"><i data-fill style="width:100%"></i></div>
-          <p class="small muted">Participants are picking. When it hits zero the Session locks by itself, or lock it sooner below.</p>
-        </section>`
-      : html`<form class="tcard stack" method="post" action="/o/${token}/timer">
-          <label class="label" for="timer-seconds">Pick timer (seconds)</label>
-          <input class="field" id="timer-seconds" name="seconds" type="number" min="${MIN_TIMER_SECONDS}" max="${MAX_TIMER_SECONDS}" step="1"
-            value="${DEFAULT_TIMER_SECONDS}" required inputmode="numeric" />
-          <p class="small muted">${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds. The timer covers word picking only. Participants can already join and enter their name and email; they wait until you start it, then see a countdown. Fixed once started: no pause, no extending.</p>
-          <button class="btn btn--secondary" type="submit">Start timer</button>
-        </form>`;
-
-  // Stage 1/5: naming is its own screen. Explicit submit (no blur-save); nothing else is rendered.
+  // Stage 1/4: naming is its own screen. Explicit submit (no blur-save); nothing else is rendered.
   if (state === "setup") {
     return shell(
       "Organizer",
@@ -129,12 +98,12 @@ export const organizerView = async (
     );
   }
 
-  // Stage 2/5 (open): invite + timer only. Stage 3/5 (picking): the same pair, then KPIs, table and Lock & Start.
+  // Stage 2/4 (open): invite, live participants table and Lock & Start. Lock is available as soon as the Session is named.
   if (!locked) {
     const lockCard = html`<div class="cta-card">
       <form method="post" action="/o/${token}/lock">
         <div class="pad pad--top"><h2>Ready to start?</h2>
-          <p class="small muted">Stops the timer if it is running and locks the Session. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
+          <p class="small muted">Locks the Session and ends picking. This can’t be undone. Late joiners are locked out. Lock the Session to upload a Transcript.</p></div>
         ${zigzag(true)}
         <div class="pad"><button class="btn btn--primary" type="submit">Lock &amp; Start Session!</button></div>
       </form>
@@ -143,16 +112,15 @@ export const organizerView = async (
       "Organizer",
       html`${header}${messages}
         <div class="stack">
-          <div class="duo">${inviteCard}${timerCard}</div>
-          ${state === "picking" ? html`${panel}${lockCard}` : ""}
+          ${inviteCard}
+          ${panel}${lockCard}
         </div>
-        <script>${raw(PAGE_JS)}</script>
-        ${state === "picking" ? html`<script>${raw(TIMER_JS)}</script>` : ""}`,
+        <script>${raw(PAGE_JS)}</script>`,
       { wide: true, strip },
     );
   }
 
-  // Stage 4/5: locked summary + upload only. Also served when a Jargon Result exists (?step=transcript) to re-score.
+  // Stage 3/4: locked summary + upload only. Also served when a Jargon Result exists (?step=transcript) to re-score.
   const n = dash.stats.participants;
   return shell(
     "Organizer",
@@ -173,11 +141,11 @@ export const organizerView = async (
   );
 };
 
-export const ORGANIZER_STAGES = ["Name", "Invite & timer", "Participants", "Transcript", "Leaderboard"];
+export const ORGANIZER_STAGES = ["Name", "Invite", "Transcript", "Leaderboard"];
 
 /** 1-based organizer stage. A locked Session is at Transcript until a Jargon Result exists, then Leaderboard. */
-export const organizerStage = (state: "setup" | "open" | "picking" | "locked", hasJargonResult: boolean) =>
-  ({ setup: 1, open: 2, picking: 3, locked: hasJargonResult ? 5 : 4 })[state];
+export const organizerStage = (state: "setup" | "open" | "locked", hasJargonResult: boolean) =>
+  ({ setup: 1, open: 2, locked: hasJargonResult ? 4 : 3 })[state];
 
 export const organizerStrip = (step: number) =>
   stepStrip({ role: "organizer", step, total: ORGANIZER_STAGES.length, labels: ORGANIZER_STAGES });

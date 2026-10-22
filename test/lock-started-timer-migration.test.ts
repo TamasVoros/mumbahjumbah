@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import { createSession, createWaitingSession } from "./helpers";
+import { createSession } from "./helpers";
 
 // Migration 0008 has already run (on an empty table) in setup, so seed rows and re-run its SQL against them.
 const migration = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0008_"))!;
@@ -17,7 +17,7 @@ describe("migration 0008: lock sessions whose timer already ran", () => {
     const ended = await createSession(env.DB, 2);
     const running = await createSession(env.DB, 2);
     const alreadyLocked = await createSession(env.DB, 2);
-    const neverStarted = await createWaitingSession(env.DB, 2);
+    const neverStarted = await createSession(env.DB, 2);
     const endedAt = "2020-01-01T00:01:00.000Z";
     const runningAt = "2999-01-01T00:01:00.000Z";
     await set(ended.id, null, endedAt);

@@ -50,7 +50,7 @@ describe("Transcript upload", () => {
     expect(page).not.toContain("unpicked");
   });
 
-  it("redirects a successful upload (303) to the leaderboard: strip 5/5, toast, recap and re-upload links", async () => {
+  it("redirects a successful upload (303) to the leaderboard: strip 4/4, toast, recap and re-upload links", async () => {
     const s = await lockedSession([["alpha", "beta"]]);
     const res = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/transcript`, {
       method: "POST",
@@ -61,7 +61,7 @@ describe("Transcript upload", () => {
     const loc = res.headers.get("location")!;
     expect(loc.startsWith(`/o/${s.organizer_link_token}/leaderboard`)).toBe(true);
     const page = await (await SELF.fetch(`https://example.com${loc}`)).text();
-    expect(page).toContain("5/5");
+    expect(page).toContain("4/4");
     expect(page).toContain("Transcript processed and discarded. Jargon Result updated.");
     expect(page).toContain(`/o/${s.organizer_link_token}/recap.png`);
     expect(page).toContain(`href="/o/${s.organizer_link_token}?step=transcript"`);
@@ -76,7 +76,7 @@ describe("Transcript upload", () => {
   it("stage 4 (locked, no result) shows only summary + upload; ?step=transcript reopens it for re-scoring", async () => {
     const s = await lockedSession([["alpha", "beta"]]);
     const page = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
-    expect(page).toContain("4/5");
+    expect(page).toContain("3/4");
     expect(page).toContain("Locked at");
     expect(page).toContain("1 participant");
     expect(page).toContain("Score the session");
@@ -86,7 +86,7 @@ describe("Transcript upload", () => {
     const again = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}?step=transcript`, { redirect: "manual" });
     expect(again.status).toBe(200);
     const html = await again.text();
-    expect(html).toContain("4/5");
+    expect(html).toContain("3/4");
     expect(html).toContain("Score the session");
     await upload(s.organizer_link_token, "b.txt", "beta");
     expect(await result(s.id)).toEqual({ beta: 1 });
@@ -101,7 +101,7 @@ describe("Transcript upload", () => {
     expect(res.status).toBe(400);
     const page = await res.text();
     expect(page).toContain('role="alert"');
-    expect(page).toContain("4/5");
+    expect(page).toContain("3/4");
     expect(page).toContain("Score the session");
   });
 
