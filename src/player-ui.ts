@@ -259,7 +259,7 @@ export const lockedSubmissionView = (sessionId: number, inviteToken: string, pic
           </div>`
         : ""}
       <div class="panel">
-        <div class="label">WAITING FOR TRANSCRIPT</div>
+        <div class="label">TRANSCRIPT PENDING</div>
         <h2>Results appear when the organizer scores it.</h2>
         <p>Check back once the transcript is in.</p>
       </div>
@@ -290,7 +290,7 @@ export const lockedView = (sessionId: number, inviteToken: string, name?: string
     html`${titleRow(sessionId, name)}
       <p class="sub">${sessionLabel(sessionId, name)} is locked. The Organizer has locked this Session, so Grids can no longer be submitted or changed. Go sit through the meeting; we’ll score it afterwards.</p>
       <div class="panel">
-        <div class="label">WAITING FOR TRANSCRIPT</div>
+        <div class="label">TRANSCRIPT PENDING</div>
         <h2>Results appear when the organizer scores it.</h2>
         <p>Check back once the transcript is in.</p>
       </div>

@@ -54,13 +54,13 @@ describe("invite-link screens follow DESIGN.md", () => {
     expect(html).toContain("Edit your Grid");
   });
 
-  it("locked: waiting-for-transcript view, 403 on GET", async () => {
+  it("locked: transcript-pending view, 403 on GET", async () => {
     const s = await createSession(env.DB, 2);
     await lockSession(env.DB, s.organizer_link_token);
     const res = await SELF.fetch(url(s.invite_link_token));
     expect(res.status).toBe(403);
     const html = await res.text();
-    expect(html).toContain("WAITING FOR TRANSCRIPT");
+    expect(html).toContain("TRANSCRIPT PENDING");
     expect(html).toContain("locked");
     expect(html).toContain("/leaderboard");
   });
@@ -72,7 +72,7 @@ describe("invite-link screens follow DESIGN.md", () => {
     expect(res.status).toBe(409);
     const html = await res.text();
     expect(html).toContain("The Session is locked");
-    expect(html).toContain("WAITING FOR TRANSCRIPT");
+    expect(html).toContain("TRANSCRIPT PENDING");
     expect(html).toContain("alpha");
     expect(html).toContain("beta");
     expect(html).not.toContain('name="pick"');
