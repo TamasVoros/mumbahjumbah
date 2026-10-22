@@ -28,7 +28,7 @@ describe("Organizer view", () => {
     const html = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
     expect(html).toContain("<span class=\"num\" data-stat=\"participants\">2</span>");
     expect(html).toContain("Lock &amp; Start Session!");
-    expect(html).toContain("3/5 · Participants");
+    expect(html).toContain("2/4 · Invite");
     expect(html).not.toContain('class="chip chip--open"');
     expect(html).not.toContain("a@x.com");
     expect(html).toContain(`action="/o/${s.organizer_link_token}/lock"`);
@@ -78,7 +78,7 @@ describe("Lock Session", () => {
     await lock(s.organizer_link_token);
     const res = await submit(s.invite_link_token, "new@x.com", ["a", "b"]);
     expect(res.status).toBe(409);
-    expect(await res.text()).toContain("Time’s up");
+    expect(await res.text()).toContain("The Session is locked");
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM participants WHERE session_id = ?").bind(s.id).first<{ n: number }>();
     expect(n!.n).toBe(0);
   });
@@ -95,5 +95,84 @@ describe("Lock Session", () => {
       .bind(s.id)
       .all<{ pick: string }>();
     expect(results.map((r) => r.pick)).toEqual(["c", "d"]);
+  });
+});
+
+describe("No timer: Lock & Start is the only cutoff", () => {
+  const name = (token: string, n: string) =>
+    SELF.fetch(`https://example.com/o/${token}/name`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ name: n }),
+    });
+  const row = (id: number) => env.DB.prepare("SELECT * FROM sessions WHERE id = ?").bind(id).first<Record<string, unknown>>();
+
+  it("a named, unlocked Session accepts submissions with nothing started", async () => {
+    const s = await createSession(env.DB, 2);
+    expect((await submit(s.invite_link_token, "a@x.com", ["one"])).status).toBe(200);
+  });
+
+  it("the organizer page offers Lock & Start as soon as the Session is open, with no timer UI", async () => {
+    const s = await createSession(env.DB, 2);
+    const html = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
+    expect(html).toContain("Lock &amp; Start Session!");
+    for (const gone of ["org-timer", "Start timer", 'name="seconds"', "Timer running", "/timer"]) {
+      expect(html).not.toContain(gone);
+    }
+  });
+
+  it("strict cutoff: saveGrid itself refuses once locked, and writes nothing", async () => {
+    const { saveGrid } = await import("../src/grids");
+    const s = await createSession(env.DB, 3);
+    const grid = { email: "a@x.com", displayName: "Ann", picks: ["one"] };
+    expect(await saveGrid(env.DB, s.id, grid)).toBe(true);
+    await lock(s.organizer_link_token);
+    expect(await saveGrid(env.DB, s.id, { ...grid, picks: ["late"] })).toBe(false);
+    const { results } = await env.DB.prepare(
+      "SELECT pk.pick FROM picks pk JOIN participants p ON p.id = pk.participant_id WHERE p.session_id = ?",
+    )
+      .bind(s.id)
+      .all<{ pick: string }>();
+    expect(results.map((r) => r.pick)).toEqual(["one"]);
+  });
+
+  it("late submission after lock: 409 read-only view with the typed picks, nothing saved", async () => {
+    const s = await createSession(env.DB, 3);
+    await lock(s.organizer_link_token);
+    const res = await submit(s.invite_link_token, "a@x.com", ["late-one", "late-two"]);
+    expect(res.status).toBe(409);
+    const html = await res.text();
+    expect(html).toContain("late-one");
+    expect(html).toContain("late-two");
+    expect(html).not.toContain('name="pick"');
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM participants WHERE session_id = ?").bind(s.id).first<{ n: number }>();
+    expect(n!.n).toBe(0);
+  });
+
+  it("the Session Name freezes at lock", async () => {
+    const s = await createSession(env.DB, 2, "Before");
+    expect((await name(s.organizer_link_token, "During")).status).toBe(200);
+    await lock(s.organizer_link_token);
+    const res = await name(s.organizer_link_token, "After");
+    expect(res.status).toBe(409);
+    expect(await res.text()).toContain("The Session is locked, so its name can’t change.");
+    expect((await row(s.id))!.name).toBe("During");
+  });
+
+  it("locking is idempotent: the first lock timestamp is kept", async () => {
+    const s = await createSession(env.DB, 2);
+    await lock(s.organizer_link_token);
+    const first = (await row(s.id))!.locked_at;
+    expect(first).toBeTruthy();
+    expect((await lock(s.organizer_link_token)).status).toBe(200);
+    expect((await row(s.id))!.locked_at).toBe(first);
+  });
+
+  it("an unnamed Session accepts no submissions and cannot lock", async () => {
+    const { createSession: createUnnamed } = await import("../src/sessions");
+    const { saveGrid } = await import("../src/grids");
+    const s = await createUnnamed(env.DB, 2);
+    expect(await saveGrid(env.DB, s.id, { email: "a@x.com", displayName: "Ann", picks: ["one"] })).toBe(false);
+    expect((await lock(s.organizer_link_token)).status).toBe(409);
   });
 });

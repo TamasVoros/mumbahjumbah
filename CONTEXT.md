@@ -17,12 +17,12 @@ The person who creates a Session, sets its Pick Count, and starts/locks it. Belo
 _Avoid_: Host, admin, operator (Organizer is a per-Session role; Operator is the account)
 
 **Session Name**:
-A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked (when the timer arrives, until it starts). Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
+A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked. Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
 _Avoid_: Title, session title (Display Name is the Participant's, not this)
 
-**Pick Timer**:
-A 30-60 second (default 30) countdown the Organizer starts once the Session has a name. It covers word picking only: identity entry happens before it starts. States: setup (no name), open (named, timer not started: Participants enter Email and Display Name, then see a "You're in" waiting screen; nothing is persisted until they submit picks, and the identity is carried to the pick form client-side), picking (timer running: Participants see the pick form and a synced countdown), locked. The timer ending and **Lock & Start Session!** are the same locked state; Lock & Start is offered on the picking screen (organizer stage 3/5) and stops the running timer; the server still accepts an early lock before the timer starts. Fixed once started (no pause or extend; the name is frozen too). The server enforces it lazily on every request (`now >= timer_ends_at` persists `locked_at = timer_ends_at`); a late submission gets a 409 with the typed picks shown read-only. Strict cutoff, no grace window.
-_Avoid_: Countdown (the participant-side display of it), deadline
+**Session states**:
+setup (no name), open (named: Participants enter Email and Display Name and pick in one pass, Join → Pick → Done; submissions are accepted, nothing waits on the Organizer), locked. **Lock & Start Session!** is the only way picking ends and is offered as soon as the Session is open; it is idempotent (the first lock timestamp is kept). A submission after lock gets a 409 with the typed picks shown read-only (strict cutoff, no grace window). There is no Pick Timer: it was removed in #50 (the `timer_*` columns remain in the DB until a later cleanup migration, but code no longer reads or writes them).
+_Avoid_: Pick Timer, countdown, picking state
 
 **Invite Link**:
 The public, unauthenticated link shared with Participants to open a Session and submit a Grid. Grants no Organizer actions.

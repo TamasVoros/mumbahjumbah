@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createWaitingSession } from "./helpers";
+import { createSession } from "./helpers";
 
 const post = (token: string, fields: [string, string][]) =>
   SELF.fetch(`https://example.com/i/${token}`, {
@@ -11,44 +11,35 @@ const post = (token: string, fields: [string, string][]) =>
 const rows = async (id: number) =>
   (await env.DB.prepare("SELECT COUNT(*) AS n FROM participants WHERE session_id = ?").bind(id).first<{ n: number }>())!.n;
 
-describe("Join before the timer (open state)", () => {
-  it("GET shows the identity form, no waiting screen and no pick form", async () => {
-    const s = await createWaitingSession(env.DB, 3, "Town hall");
+describe("Join (open Session)", () => {
+  it("GET shows the identity fields and the pick form together, no waiting screen", async () => {
+    const s = await createSession(env.DB, 3, "Town hall");
     const res = await SELF.fetch(`https://example.com/i/${s.invite_link_token}`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain('name="email"');
     expect(html).toContain('name="display_name"');
-    expect(html).toContain(">Join<");
+    expect(html).toContain('id="pickapp"');
     expect(html).not.toContain('id="waiting"');
-    expect(html).not.toContain('id="pickapp"');
+    expect(html).not.toContain("countdown");
+    expect(html).not.toContain('id="timer"');
   });
 
-  it("valid identity: 200 waiting screen greeting by name, edit form, nothing persisted", async () => {
-    const s = await createWaitingSession(env.DB, 3);
+  it("valid identity with no picks stays on the pick form with the identity kept, nothing persisted", async () => {
+    const s = await createSession(env.DB, 3);
     const res = await post(s.invite_link_token, [["email", "a@x.com"], ["display_name", "Ann"]]);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const html = await res.text();
-    expect(html).toContain('id="waiting"');
-    expect(html).toContain("You’re in as Ann");
-    expect(html).toContain("Edit name or email");
+    expect(html).toContain("Submit between 1 and 3 picks");
+    expect(html).toContain('id="pickapp"');
     expect(html).toContain('value="a@x.com"');
-    expect(html).not.toContain('id="pickapp"');
+    expect(html).toContain('value="Ann"');
+    expect(html).not.toContain('id="waiting"');
     expect(await rows(s.id)).toBe(0);
   });
 
-  // Regression: ISSUE-001 — the waiting page is a POST response, so location.reload() re-posted the join form
-  // when the timer started and showed "Submit between 1 and N picks" with no action from the participant.
-  // Found by /qa on 2026-10-17
-  it("waiting screen leaves via a GET navigation, never a reload that would re-post the join form", async () => {
-    const s = await createWaitingSession(env.DB, 3);
-    const html = await (await post(s.invite_link_token, [["email", "a@x.com"], ["display_name", "Ann"]])).text();
-    expect(html).toContain("location.replace(location.pathname+location.search)");
-    expect(html).not.toContain("location.reload()");
-  });
-
-  it("invalid identity: 400 with inline error, no waiting screen, input kept", async () => {
-    const s = await createWaitingSession(env.DB, 3);
+  it("invalid identity: 400 with inline error, input kept", async () => {
+    const s = await createSession(env.DB, 3);
     const bad = await post(s.invite_link_token, [["email", "nope"], ["display_name", "Ann"]]);
     expect(bad.status).toBe(400);
     const html = await bad.text();
@@ -60,18 +51,31 @@ describe("Join before the timer (open state)", () => {
     expect(await rows(s.id)).toBe(0);
   });
 
-  it("picks posted while open: 409 waiting view with notice, nothing saved", async () => {
-    const s = await createWaitingSession(env.DB, 3);
+  it("picks posted while open (no timer started) are saved", async () => {
+    const s = await createSession(env.DB, 3);
     const res = await post(s.invite_link_token, [["email", "a@x.com"], ["display_name", "Ann"], ["pick", "one"]]);
-    expect(res.status).toBe(409);
-    const html = await res.text();
-    expect(html).toContain("nothing was saved");
-    expect(html).toContain('id="waiting"');
-    expect(await rows(s.id)).toBe(0);
+    expect(res.status).toBe(200);
+    expect(await rows(s.id)).toBe(1);
+  });
+
+  it("status endpoint reports only open or locked", async () => {
+    const s = await createSession(env.DB, 3);
+    const open = await SELF.fetch(`https://example.com/i/${s.invite_link_token}/status`);
+    expect(await open.json()).toEqual({ state: "open" });
+    await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/lock`, { method: "POST" });
+    const locked = await SELF.fetch(`https://example.com/i/${s.invite_link_token}/status`);
+    expect(await locked.json()).toEqual({ state: "locked" });
+    expect((await SELF.fetch("https://example.com/i/nope/status")).status).toBe(404);
+  });
+
+  it("the start-timer endpoint is gone", async () => {
+    const s = await createSession(env.DB, 3);
+    const res = await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/timer`, { method: "POST" });
+    expect(res.status).toBe(404);
   });
 
   it("identity-only joiners never show in the organizer view", async () => {
-    const s = await createWaitingSession(env.DB, 3);
+    const s = await createSession(env.DB, 3);
     await post(s.invite_link_token, [["email", "ghost@x.com"], ["display_name", "Ghost"]]);
     const org = await (await SELF.fetch(`https://example.com/o/${s.organizer_link_token}`)).text();
     expect(org).not.toContain("Ghost");

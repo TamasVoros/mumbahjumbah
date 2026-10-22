@@ -20,7 +20,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export type IdentityResult = { ok: true; value: { email: string; displayName: string } } | { ok: false; error: string };
 
-/** Email + Display name checks, shared by the pre-timer join step and the full Grid submission. */
+/** Email + Display name checks, shared by the join step and the full Grid submission. */
 export function validateIdentity(raw: { email?: unknown; display_name?: unknown }): IdentityResult {
   const email = typeof raw.email === "string" ? normalizeEmail(raw.email) : "";
   if (email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) return { ok: false, error: "Enter a valid email address." };
@@ -78,11 +78,9 @@ export async function saveGrid(
   db: D1Database,
   sessionId: number,
   grid: GridInput,
-  nowMs: number = Date.now(),
 ): Promise<boolean> {
-  // Open = timer running (started, not ended) and not locked. Strict cutoff, no grace window.
-  const open = "EXISTS (SELECT 1 FROM sessions WHERE id = ? AND locked_at IS NULL AND timer_ends_at > ?)";
-  const now = new Date(nowMs).toISOString();
+  // Open = named and not locked. Strict cutoff at lock, no grace window.
+  const open = "EXISTS (SELECT 1 FROM sessions WHERE id = ? AND name IS NOT NULL AND locked_at IS NULL)";
   const [upsert] = await db.batch<{ id: number }>([
     db
       .prepare(
@@ -92,20 +90,20 @@ export async function saveGrid(
            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          RETURNING id`,
       )
-      .bind(sessionId, grid.email, grid.displayName, sessionId, now),
+      .bind(sessionId, grid.email, grid.displayName, sessionId),
     db
       .prepare(
         `DELETE FROM picks WHERE ${open}
            AND participant_id = (SELECT id FROM participants WHERE session_id = ? AND email = ?)`,
       )
-      .bind(sessionId, now, sessionId, grid.email),
+      .bind(sessionId, sessionId, grid.email),
     ...grid.picks.map((p) =>
       db
         .prepare(
           `INSERT INTO picks (participant_id, pick)
            SELECT id, ? FROM participants WHERE session_id = ? AND email = ? AND ${open}`,
         )
-        .bind(p, sessionId, grid.email, sessionId, now),
+        .bind(p, sessionId, grid.email, sessionId),
     ),
   ]);
   return (upsert?.results.length ?? 0) > 0;

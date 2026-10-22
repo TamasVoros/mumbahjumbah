@@ -1,9 +1,8 @@
 import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
-import { entryView, waitingView } from "../../src/player-ui";
+import { entryView } from "../../src/player-ui";
 
-// Drives the real inline identity script: waiting screen stores the identity, the pick form prefills from it.
-const timer = { endsAt: Date.now() + 30_000, seconds: 30, now: Date.now(), statusUrl: "/i/tok123/status" };
+// Drives the real inline identity script: submitting the pick form stores the identity, and the form prefills from it on the next visit.
 const KEY = "mj:id:tok123";
 
 const load = (markup: string, store?: string) => {
@@ -19,7 +18,7 @@ const load = (markup: string, store?: string) => {
 };
 
 describe("identity prefill", () => {
-  const pickForm = () => String(entryView(1, 3, {}, undefined, "S", timer));
+  const pickForm = () => String(entryView(1, 3, {}, undefined, "S"));
 
   it("fills both pick-form fields from stored identity", () => {
     const t = load(pickForm(), JSON.stringify({ email: "a@x.com", display_name: "Ann" }));
@@ -34,13 +33,17 @@ describe("identity prefill", () => {
   });
 
   it("does not overwrite server-provided values", () => {
-    const markup = String(entryView(1, 3, { email: "s@x.com", display_name: "Server" }, undefined, "S", timer));
+    const markup = String(entryView(1, 3, { email: "s@x.com", display_name: "Server" }, undefined, "S"));
     const t = load(markup, JSON.stringify({ email: "a@x.com", display_name: "Ann" }));
     expect([t.email(), t.name()]).toEqual(["s@x.com", "Server"]);
   });
 
-  it("waiting screen stores the identity for the pick form", () => {
-    const t = load(String(waitingView(1, "/i/tok123/status", "S", undefined, { email: "a@x.com", displayName: "Ann" })));
+  it("submitting the form stores the identity for the next visit", () => {
+    const t = load(pickForm());
+    const doc = t.dom.window.document;
+    doc.querySelector<HTMLInputElement>("input[name=email]")!.value = " a@x.com ";
+    doc.querySelector<HTMLInputElement>("input[name=display_name]")!.value = "Ann";
+    doc.querySelector("form")!.dispatchEvent(new t.dom.window.Event("submit", { cancelable: true }));
     expect(JSON.parse(t.dom.window.localStorage.getItem(KEY)!)).toEqual({ email: "a@x.com", display_name: "Ann" });
   });
 });
