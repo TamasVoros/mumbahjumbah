@@ -13,23 +13,23 @@ The tenant/account that owns a group of Sessions — the thing a facilitator or 
 _Avoid_: Account, tenant, team (reserve for later multi-Operator/cross-Operator framing if needed)
 
 **Organizer**:
-The person who creates a Session, sets its Pick Count, and starts/locks it. Belongs to exactly one Operator. In v1, the sole Operator is also the only Organizer, so the two collapse into one person — kept as separate concepts so Approach B (an Operator with multiple staff each organizing sessions) doesn't require renaming anything later.
+The person who creates a Session, sets its Pick Count, and locks it. Belongs to exactly one Operator. In v1, the sole Operator is also the only Organizer, so the two collapse into one person — kept as separate concepts so Approach B (an Operator with multiple staff each organizing sessions) doesn't require renaming anything later.
 _Avoid_: Host, admin, operator (Organizer is a per-Session role; Operator is the account)
 
 **Session Name**:
-A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked. Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
+A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked; it freezes at lock. Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
 _Avoid_: Title, session title (Display Name is the Participant's, not this)
 
-**Session states**:
-setup (no name), open (named: Participants enter Email and Display Name and pick in one pass, Join → Pick → Done; submissions are accepted, nothing waits on the Organizer), locked. **Lock & Start Session!** is the only way picking ends and is offered as soon as the Session is open; it is idempotent (the first lock timestamp is kept). A submission after lock gets a 409 with the typed picks shown read-only (strict cutoff, no grace window). There is no Pick Timer: it was removed in #50 (the `timer_*` columns remain in the DB until a later cleanup migration, but code no longer reads or writes them).
-_Avoid_: Pick Timer, countdown, picking state
+**Lock & Start Session!**:
+The Organizer's button that locks the Session, and the only way picking ends: there is no timer or deadline. A Session moves setup (no name) → open (named, Invite Link live: Participants enter Email and Display Name and pick in one pass, so they can submit as soon as the Session is named) → locked. Submissions are accepted while the Session is not locked; a submission after lock gets a 409 with the typed picks shown read-only. The Session Name freezes at lock. See [ADR-0004](docs/adr/0004-remove-pick-timer.md).
+_Avoid_: Start (it does not begin picking; the Invite Link going live does), close
 
 **Invite Link**:
 The public, unauthenticated link shared with Participants to open a Session and submit a Grid. Grants no Organizer actions.
 _Avoid_: Session link, the link (ambiguous with Organizer Link)
 
 **Organizer Link**:
-A separate, private, unguessable link generated alongside the Invite Link when a Session is created. Only this link can start/lock the Session or upload its Transcript — the only thing gating Organizer actions in v1, since there's no login at all. A later phase replaces this with real authenticated access (and audit logging of Organizer actions) rather than link-secrecy.
+A separate, private, unguessable link generated alongside the Invite Link when a Session is created. Only this link can lock the Session or upload its Transcript — the only thing gating Organizer actions in v1, since there's no login at all. A later phase replaces this with real authenticated access (and audit logging of Organizer actions) rather than link-secrecy.
 _Avoid_: Admin link, invite link (the two links grant different, non-overlapping capabilities)
 
 **Participant**:
