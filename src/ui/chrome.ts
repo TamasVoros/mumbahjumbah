@@ -79,7 +79,7 @@ body>main,body>.wrap{flex:1 0 auto}
 .site-menu__panel{position:absolute;right:0;top:100%;min-width:200px;display:flex;flex-direction:column;background:#1F2F63;border:1.5px solid #F4EFE6;border-radius:2px;padding:6px}
 .site-menu__panel a{display:flex;align-items:center;min-height:44px;padding:0 12px;border-radius:2px;color:#F4EFE6;font-weight:600;font-size:15px;text-decoration:none}
 .site-menu__panel a:hover{background:#172352;color:#F4EFE6}
-.step-strip{box-sizing:border-box;width:100%;background:#F4EFE6;border-bottom:1.5px solid #17140F;color:#17140F}
+.step-strip{box-sizing:border-box;width:100%;background:#F4EFE6;color:#17140F}
 .step-strip *{box-sizing:border-box}
 .step-strip__in{max-width:80rem;margin:0 auto;padding:10px 24px;display:flex;flex-direction:column;gap:8px}
 .step-strip__label{margin:0;font:400 11px/1.3 'JetBrains Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:#5F5648;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
