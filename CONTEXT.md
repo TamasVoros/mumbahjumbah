@@ -49,7 +49,7 @@ A Participant's set of 1 up to Pick Count distinct Picks for a Session. Purely a
 _Avoid_: Card, board, picks (picks are the words themselves, the grid is the container)
 
 **Pick Count**:
-The maximum number of Picks a Grid may contain for a given Session, set by the Organizer when creating the Session (labelled "Maximum picks"; any integer from 1 to 100 is valid, not constrained to a perfect square). A Grid holds between 1 and Pick Count Picks; Score is unchanged (sum of occurrence counts), so fewer Picks simply means fewer chances to score. See [ADR-0003](docs/adr/0003-pick-count-is-a-maximum.md). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
+The maximum number of Picks a Grid may contain for a given Session, set by the Organizer when creating the Session (labelled "Maximum picks"; any integer from 1 to 100 is valid, not constrained to a perfect square). A Grid holds between 1 and Pick Count Picks; fewer Picks simply means fewer chances to score. See [ADR-0003](docs/adr/0003-pick-count-is-a-maximum.md). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
 _Avoid_: Grid size, dimensions (no x/y shape exists in the model)
 
 **Pick**:
@@ -65,7 +65,7 @@ The persisted, derived term-frequency data extracted from a Transcript via bound
 _Avoid_: Frequency data, word counts (acceptable informally, but Jargon Result is canonical when referring to the stored artifact), word-frequency (use term-frequency — Picks aren't always single words)
 
 **Score**:
-A Participant's total for a Session: the sum of transcript occurrence counts for each distinct Pick that appears at least once in the Jargon Result (after stopword filtering, for single-word Picks).
+A Participant's total for a Session: the sum of the **values** of their Picks. A term's value is the same for everyone who picked it: `round(10 × log2(1 + occurrences) × phrase × rarity)`, where phrase is 1.5 for a multi-word Pick (else 1) and rarity is `max(1 − share of participants who picked it, 0.1)` (1 when the Session has fewer than 4 participants). Values are rounded per term before summing; a Pick absent from the Jargon Result is worth 0; misses carry no penalty. Ties break on hits (Picks present in the Jargon Result), then submission order. See [ADR-0005](docs/adr/0005-scoring-v2-term-values.md).
 _Avoid_: Points, rank (rank is derived from Score, not the same thing)
 
 **Recap Card**:

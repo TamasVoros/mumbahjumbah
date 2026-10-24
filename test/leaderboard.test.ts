@@ -25,10 +25,10 @@ function upload(t: string, content: string) {
 async function setup() {
   const s = await createSession(env.DB, 2);
   await submit(s.invite_link_token, "a@x.com", "Zero1", ["nope", "never"]);
-  await submit(s.invite_link_token, "b@x.com", "Bold", ["synergy", "ai"]); // 3 + 2 = 5
+  await submit(s.invite_link_token, "b@x.com", "Bold", ["synergy", "ai"]); // synergy 16 + ai 6 = 22
   await submit(s.invite_link_token, "c@x.com", "Zero2", ["absent", "missing"]);
-  await submit(s.invite_link_token, "d@x.com", "TieLate", ["ai", "nope"]); // 2
-  await submit(s.invite_link_token, "e@x.com", "TieEarly", ["ai", "other"]); // 2, but submitted after TieLate
+  await submit(s.invite_link_token, "d@x.com", "TieLate", ["ai", "nope"]); // 6 (1 hit)
+  await submit(s.invite_link_token, "e@x.com", "TieEarly", ["ai", "other"]); // 6 (1 hit), submitted after TieLate
   await lock(s.organizer_link_token);
   return s;
 }
@@ -41,9 +41,9 @@ describe("getLeaderboard", () => {
     await upload(s.organizer_link_token, T1);
     const board = await getLeaderboard(env.DB, s.id);
     expect(board.map((e) => [e.rank, e.displayName, e.score])).toEqual([
-      [1, "Bold", 5],
-      [2, "TieLate", 2],
-      [3, "TieEarly", 2],
+      [1, "Bold", 22],
+      [2, "TieLate", 6],
+      [3, "TieEarly", 6],
       [4, "Zero1", 0],
       [5, "Zero2", 0],
     ]);
@@ -76,7 +76,23 @@ describe("getLeaderboard", () => {
     await lock(other.organizer_link_token);
     await upload(other.organizer_link_token, "synergy");
     await upload(s.organizer_link_token, T1);
-    expect((await getLeaderboard(env.DB, other.id)).map((e) => e.score)).toEqual([1]);
+    expect((await getLeaderboard(env.DB, other.id)).map((e) => e.score)).toEqual([10]);
+  });
+
+  it("breaks score ties by hits, then submission order", async () => {
+    const s = await createSession(env.DB, 3);
+    // 3 participants: rarity is 1, so aa x3 = 20 and bb/cc x1 = 10 each.
+    await submit(s.invite_link_token, "a@x.com", "OneHit", ["aa"]); // 20, 1 hit
+    await submit(s.invite_link_token, "b@x.com", "TwoHits", ["bb", "cc"]); // 10 + 10, 2 hits
+    await submit(s.invite_link_token, "c@x.com", "Late", ["aa"]); // 20, 1 hit
+    await lock(s.organizer_link_token);
+    await upload(s.organizer_link_token, "aa aa aa bb cc");
+    const board = await getLeaderboard(env.DB, s.id);
+    expect(board.map((e) => [e.displayName, e.score, e.hits])).toEqual([
+      ["TwoHits", 20, 2],
+      ["OneHit", 20, 1],
+      ["Late", 20, 1],
+    ]);
   });
 });
 
@@ -91,14 +107,26 @@ describe("leaderboard routes", () => {
       const res = await SELF.fetch(`https://example.com${path}`);
       expect(res.status).toBe(200);
       const body = await res.text();
-      expect(body).toContain(cells(1, "Bold", 5));
+      expect(body).toContain(cells(1, "Bold", 22));
       expect(body).toContain(cells(5, "Zero2", 0));
       expect(body).not.toContain("a@x.com");
     }
     await upload(s.organizer_link_token, "ai ai ai ai");
     const body = await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}/leaderboard`)).text();
-    expect(body).toContain(cells(1, "Bold", 4));
-    expect(body).toContain(cells(2, "TieLate", 4));
+    expect(body).toContain(cells(1, "Bold", 9));
+    expect(body).toContain(cells(2, "TieLate", 9));
+  });
+
+  it("shows term values, a scoring explanation and per-participant pick values", async () => {
+    const s = await setup();
+    await upload(s.organizer_link_token, T1);
+    const body = await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}/leaderboard`)).text();
+    expect(body).toContain('id="scoring-note"');
+    expect(body).toContain("worth 16"); // synergy in the jargon strip
+    expect(body).toContain("<li><b>synergy</b><span>16</span></li>");
+    expect(body).toContain("<li><b>ai</b><span>6</span></li>");
+    expect(body).toContain("2 picks never said"); // unsaid picks stay unnamed
+    expect(body).not.toContain("<b>nope</b>");
   });
 
   it("applies the DESIGN.md leaderboard styling", async () => {
