@@ -563,6 +563,7 @@ h1{font-size:26px}h2{font-size:22px}
 .words li.top::before{background:#E3C26E}
 .words b{font-weight:600;overflow-wrap:anywhere}
 .words .x{font:400 20px/1 Anton,Impact,sans-serif}
+.breakdown{margin-top:20px}.breakdown h2{font-size:16px;margin:0 0 8px}.breakdown details{border:1.5px solid #3C4E8A;border-radius:2px;margin-bottom:8px;padding:0 12px}.breakdown summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700}.pickvals{list-style:none;margin:0 0 10px;padding:0}.pickvals li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid #3C4E8A}.pickvals span{font:400 18px/1 Anton,Impact,sans-serif}.pickvals .muted{opacity:.7}
 .words .n{font:400 11px "JetBrains Mono",monospace;color:#5F5648;margin-right:10px}
 .rows{width:100%;border:0;border-collapse:collapse}
 .rows tbody{display:flex;flex-direction:column;gap:8px}
@@ -608,6 +609,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   const maxWord = Math.max(1, ...jargon.map((j) => j.occurrences));
   const topScore = Math.max(1, ...board.map((e) => e.score));
+  const values = new Map(board.flatMap((e) => e.picks.map((p) => [p.term, p.value] as const)));
   return html`<!doctype html>
 <html lang="en">
   <head>
@@ -633,7 +635,7 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
           : html`<ul class="words">
               ${jargon.map(
                 (j, i) =>
-                  html`<li class="${i === 0 ? "top" : ""}" style="--w:${Math.round((j.occurrences / maxWord) * 100)}%"><b>${j.term}</b><span><span class="n">${j.occurrences} picked</span><span class="x">×${j.occurrences}</span></span></li>`,
+                  html`<li class="${i === 0 ? "top" : ""}" style="--w:${Math.round((j.occurrences / maxWord) * 100)}%"><b>${j.term}</b><span><span class="n">worth ${values.get(j.term) ?? 0}</span><span class="x">×${j.occurrences}</span></span></li>`,
               )}
             </ul>`}
       </section>
@@ -651,7 +653,22 @@ const leaderboardPage = async (db: D1Database, session: Session, recapUrl: strin
                 )}
               </tbody>
             </table>`}
-        <a id="recap-link" class="recap" href="${recapUrl}">Recap Card (shareable PNG)</a>
+        <p class="small" id="scoring-note">Rarer terms, phrases and words said often (with diminishing returns) are worth more: solo picks and phrases earn the most.</p>
+        ${board.length === 0
+          ? ""
+          : html`<div class="breakdown" id="breakdown">
+              <h2>Your picks, one value each</h2>
+              ${board.map((e) => {
+                const said = e.picks.filter((p) => p.occurrences > 0);
+                const unsaid = e.picks.length - said.length;
+                return html`<details><summary>${e.displayName} · ${e.score}</summary>
+                  <ul class="pickvals">
+                    ${said.map((p) => html`<li><b>${p.term}</b><span>${p.value}</span></li>`)}
+                    ${unsaid > 0 ? html`<li class="muted"><b>${unsaid} ${unsaid === 1 ? "pick" : "picks"} never said</b><span>0</span></li>` : ""}
+                  </ul></details>`;
+              })}
+            </div>`}
+        <a id="recap-link" class="recap"href="${recapUrl}">Recap Card (shareable PNG)</a>
         ${organizer ? html`<p class="small"><a id="rescore-link" href="/o/${organizer.token}?step=transcript">Upload a different transcript</a></p>` : ""}
       </section>
     </main>

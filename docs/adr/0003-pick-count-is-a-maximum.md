@@ -2,7 +2,7 @@
 
 **Status:** accepted
 
-Originally every Grid had to contain exactly Pick Count Picks. We changed Pick Count to a **maximum**: a Participant submits between 1 and Pick Count distinct Picks. Scoring is unchanged (the sum of occurrence counts of each distinct Pick), so submitting fewer Picks is a legitimate strategy rather than an error.
+Originally every Grid had to contain exactly Pick Count Picks. We changed Pick Count to a **maximum**: a Participant submits between 1 and Pick Count distinct Picks. Submitting fewer Picks is a legitimate strategy rather than an error. (Originally "scoring is unchanged: the sum of occurrence counts"; that scoring is superseded by [ADR-0005](0005-scoring-v2-term-values.md).)
 
 **Why:** an exact count forces filler picks from participants who have fewer genuine predictions, which pollutes the Jargon Result and makes per-participant pick counts uniform and therefore uninformative. With a maximum, "median picks per participant" becomes a meaningful statistic.
 

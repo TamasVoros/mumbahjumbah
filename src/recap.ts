@@ -65,6 +65,7 @@ const img = (src: string, width: number, height: number, style: Record<string, u
  */
 export function recapLayout(board: LeaderboardEntry[], jargon: Counted[]): Node {
   const top = [...jargon].sort((a, b) => b.occurrences - a.occurrences || a.term.localeCompare(b.term))[0];
+  const topValue = board.flatMap((e) => e.picks).find((p) => p.term === top?.term)?.value;
   const podium = board.slice(0, PODIUM_ROWS);
   const winner = podium[0];
 
@@ -74,7 +75,7 @@ export function recapLayout(board: LeaderboardEntry[], jargon: Counted[]): Node 
         `${winner ? `${winner.score} points. ` : ""}Most-said word:`,
         // NBSP: satori trims a plain trailing space before an inline element.
         el("b", { fontWeight: 800 }, ` “${truncate(top.term, 24)}”`),
-        `, ${top.occurrences} ${top.occurrences === 1 ? "time" : "times"}.`,
+        `, ${top.occurrences} ${top.occurrences === 1 ? "time" : "times"}${topValue === undefined ? "" : `, worth ${topValue}`}.`,
       ]
     : [winner ? `${winner.score} points. ` : "", "No picks matched the transcript."];
 
