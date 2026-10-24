@@ -1,0 +1,113 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Priya: Okay, let's get started, I think everyone who is coming is here. Thanks for joining the quarterly planning sync. The goal today is simple: align on the roadmap, surface any blockers, and leave with clear owners for every deliverable.
+
+2
+00:00:20.000 --> 00:00:45.000
+Marcus: Thanks Priya. Before we dive in, I want to say that the team has really leaned into the new agile process this quarter. We shipped three sprints in a row without slipping, and the stakeholders have noticed the difference.
+
+3
+00:00:45.000 --> 00:01:15.000
+Priya: Love that. So let's start with the roadmap. At the end of the day, our north star is customer retention, and every item on this roadmap should move the needle on that one metric. If it doesn't move the needle, we should question why it is on the list.
+
+4
+00:01:15.000 --> 00:01:50.000
+Dana: I'd agree with that, and I want to flag that the analytics work is a big piece. We need a proper KPI dashboard, because right now every team is measuring a different thing and there is no alignment on what success looks like. Marketing tracks signups, sales tracks pipeline, and support tracks tickets.
+
+5
+00:01:50.000 --> 00:02:25.000
+Marcus: Right, and that is a classic silo problem. There is a lot of synergy between those three teams that we are simply not capturing. If we could get one shared view, the synergy would be obvious, and honestly the ROI on the dashboard would pay for itself within a quarter.
+
+6
+00:02:25.000 --> 00:03:00.000
+Tomas: Can I jump in on the ROI point? I did a rough calculation last week. The dashboard costs roughly two engineers for six weeks. If it lifts retention by even one percent, the ROI is clearly positive. But I want to be careful, because I do not have the bandwidth to own this on top of the migration.
+
+7
+00:03:00.000 --> 00:03:35.000
+Priya: That is fair, Tomas, and bandwidth is exactly the thing I want to talk about. We are all stretched thin. So let me propose that we pick the low-hanging fruit first. What can we ship in two weeks that gives us a visible win without a heavy lift?
+
+8
+00:03:35.000 --> 00:04:10.000
+Dana: The onboarding emails are definitely low-hanging fruit. We already have the copy, we just need to wire up the triggers. I can have that done by the end of next sprint. It is not glamorous, but it is the kind of quick win that builds momentum.
+
+9
+00:04:10.000 --> 00:04:45.000
+Aisha: Can I ask a question about the onboarding emails? Have we thought about personalization? There is a lot of buzz around using AI to tailor the content, and I think AI could really help here. I have seen a couple of demos where the AI picks the best subject line for each user.
+
+10
+00:04:45.000 --> 00:05:20.000
+Marcus: I love the energy, Aisha, but let's not boil the ocean. AI is a great topic, but I would rather get the basics right first. We can revisit AI in the next quarter once we have clean data. Otherwise we are just leveraging a shiny tool on top of a messy foundation.
+
+11
+00:05:20.000 --> 00:05:55.000
+Aisha: That is fair. I just do not want us to miss the paradigm shift. Every competitor is talking about AI, and if we wait too long we will be playing catch-up. But I hear you on the data quality, and I am happy to do a deep dive on what clean data would actually require.
+
+12
+00:05:55.000 --> 00:06:30.000
+Priya: Great, Aisha, a deep dive is exactly the right next step. Let's make that an action item. Can you put together a short document and share it before the next meeting? Nothing fancy, just a one-pager on what data we have and what is missing.
+
+13
+00:06:30.000 --> 00:07:05.000
+Aisha: Absolutely, I will take that. I will loop in Tomas since he knows the data pipeline better than anyone. Tomas, is it okay if I grab thirty minutes with you on Thursday to touch base?
+
+14
+00:07:05.000 --> 00:07:40.000
+Tomas: Thursday works. I will say that the pipeline is the biggest blocker right now. We have three blockers in the migration, and until those are resolved we cannot build anything scalable on top of it. The first blocker is the legacy schema, the second is the access permissions, and the third is the vendor contract.
+
+15
+00:07:40.000 --> 00:08:15.000
+Marcus: The vendor contract is something I can help with. I will circle back with procurement tomorrow and see where we are. I suspect it is just waiting on a signature, but I do not want to assume. Let me circle back with an update by end of day Friday.
+
+16
+00:08:15.000 --> 00:08:50.000
+Priya: Thank you, Marcus. Let's talk about the pivot for a moment. Some of you will have seen the leadership note about shifting focus toward the enterprise segment. I know a pivot sounds scary, but this is more of a gradual shift than a hard turn. We are not throwing away what we built.
+
+17
+00:08:50.000 --> 00:09:25.000
+Dana: Can I push back a little? An enterprise pivot changes everything about how we support customers. Enterprise buyers want security reviews, custom contracts, and dedicated support. Going forward, we need to be honest about whether we have the resources to deliver on all of that.
+
+18
+00:09:25.000 --> 00:10:00.000
+Priya: That is a really important point, Dana, and I do not have a perfect answer. What I can say is that going forward we will treat every enterprise request as a separate stream, with its own owner, so that it does not distract from the core roadmap. Does that feel workable?
+
+19
+00:10:00.000 --> 00:10:35.000
+Tomas: It feels workable as long as there is real alignment from leadership. If the stakeholders keep changing the priorities every month, no amount of process is going to save us. I would love a commitment that the roadmap stays stable for at least one full quarter.
+
+20
+00:10:35.000 --> 00:11:10.000
+Marcus: I second that. Stable priorities are the single biggest lever for the team. And I will add that we should build a healthy ecosystem of partners instead of trying to build everything ourselves. A strong ecosystem is a force multiplier, and it would take pressure off our bandwidth.
+
+21
+00:11:10.000 --> 00:11:45.000
+Aisha: On the partner ecosystem, I have a contact at a company that does integrations, and they would be a natural fit. I can set up an intro. It might be worth a quick call, and if it goes well we can fold them into the roadmap for the following quarter.
+
+22
+00:11:45.000 --> 00:12:20.000
+Priya: Wonderful, please do. Okay, we have about ten minutes left, so let me try to summarize. First, we agree to focus on low-hanging fruit, starting with the onboarding emails. Second, Aisha will do a deep dive on data quality ahead of any AI work. Third, Marcus will circle back on the vendor contract.
+
+23
+00:12:20.000 --> 00:12:55.000
+Dana: And fourth, we build the KPI dashboard, but only once Tomas has the bandwidth after the migration. I do not want us to commit to a deliverable we cannot hit. Let's be realistic about the timeline and under-promise, then over-deliver.
+
+24
+00:12:55.000 --> 00:13:30.000
+Tomas: Thank you for that, Dana. I would add that the dashboard should be scalable from day one. If we build it for three teams and then the company doubles, we will have to rebuild it. Let's design for growth, not just for today's headcount.
+
+25
+00:13:30.000 --> 00:14:05.000
+Marcus: Agreed. One last thing from me: the retrospective for the last sprint raised a point about meetings. People feel there are too many of them. Maybe for anything that is not a decision, we take it offline and use the shared document instead. We can take that offline and decide in writing.
+
+26
+00:14:05.000 --> 00:14:40.000
+Priya: I like that, let's take the meeting question offline and I will draft a proposal. Alright everyone, thank you for the great discussion. To recap the owners: Dana has the onboarding emails, Aisha has the deep dive, Marcus has the vendor contract, and Tomas has the migration blockers.
+
+27
+00:14:40.000 --> 00:15:10.000
+Aisha: Just a last thought before we go. Whatever we do, let's keep the customer at the center. At the end of the day the roadmap, the dashboard, the AI experiments and the partners are all just means to one end, which is a better experience for the people who use our product.
+
+28
+00:15:10.000 --> 00:15:30.000
+Priya: Beautifully said. Let's circle back next week with updates, and in the meantime, keep the synergy going. Thanks everyone, have a great rest of your day, and we will see you at the next planning sync.
