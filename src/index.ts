@@ -1,6 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { html, raw } from "hono/html";
-import { secureHeaders } from "hono/secure-headers";
+import { NONCE, secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
 import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
@@ -35,14 +35,16 @@ export type Bindings = { DB: D1Database; SESSIONS_LIMITER: RateLimit; INVITE_LIM
 
 export const app = new Hono<{ Bindings: Bindings }>();
 
-// Security headers on every response. Pages use inline <style>/<script> and Google Fonts, so script/style
-// keep 'unsafe-inline' for now (moving to nonces is a follow-up); everything else is locked down.
+// Security headers on every response. Inline <style>/<script> run only with a per-request nonce (stamped on
+// by the HTMLRewriter middleware below); Google Fonts is allowed; everything else is locked down.
 app.use(
   secureHeaders({
     contentSecurityPolicy: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'", NONCE],
+      styleSrc: ["'self'", NONCE,"https://fonts.googleapis.com"],
+      // style="" attributes can't carry nonces; attributes cannot run script, so this is a narrow compromise.
+      styleSrcAttr: ["'unsafe-inline'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       imgSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
@@ -56,6 +58,19 @@ app.use(
     xContentTypeOptions: "nosniff",
   }),
 );
+
+// Stamp the request's CSP nonce onto every <script> and <style> tag in HTML responses.
+app.use("*", async (c, next) => {
+  await next();
+  const nonce = c.get("secureHeadersNonce" as never) as string | undefined;
+  if (!nonce || !c.res.headers.get("content-type")?.includes("text/html")) return;
+  const stamp = {
+    element(el: Element) {
+      el.setAttribute("nonce", nonce);
+    },
+  };
+  c.res = new HTMLRewriter().on("script", stamp).on("style", stamp).transform(c.res);
+});
 
 // Capability URLs (organizer/invite tokens) and freshly minted links must never be cached.
 app.use("*", async (c, next) => {

@@ -28,7 +28,7 @@ describe("invite-link screens follow DESIGN.md", () => {
   it("entry: inline script is syntactically valid", async () => {
     const s = await createSession(env.DB, 3);
     const html = await (await SELF.fetch(url(s.invite_link_token))).text();
-    const script = /<script>([\s\S]*?)<\/script>/.exec(html)![1]!;
+    const script = /<script[^>]*>([\s\S]*?)<\/script>/.exec(html)![1]!;
     expect(() => new Function(script)).not.toThrow();
   });
 
