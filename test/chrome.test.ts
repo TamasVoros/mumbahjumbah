@@ -10,7 +10,22 @@ const lock = (token: string) => SELF.fetch(`${base}/o/${token}/lock`, { method: 
 const expectChrome = (body: string, organizer = false) => {
   expect(body).toContain('<header class="site-header">');
   expect(body).toMatch(/<a class="site-brand" href="\/">/);
-  expect(body.includes('class="site-chip">Organizer<')).toBe(organizer);
+  expect(body).not.toContain("site-chip");
+  expect(/<header class="site-header">[\s\S]*?<\/header>/.exec(body)![0]).not.toContain("Organizer");
+  expect(body).toContain('<summary aria-label="Menu" aria-controls="site-menu-panel" aria-expanded="false">');
+  expect(body).toContain('id="site-menu-panel"');
+  for (const [href, label] of [["/", "Home"], ["/plans", "See plans"], ["/#privacy", "Privacy"]])
+    expect(body).toContain(`<a href="${href}">${label}</a>`);
+  expect(body).not.toContain("Sign in");
+  // Sticky footer + one container rule, no per-page 100vh hacks.
+  expect(body).toContain("min-height:100vh;display:flex;flex-direction:column");
+  expect(body).not.toMatch(/\.(wrap|lb-page|board)\{[^}]*min-height:100vh/);
+  expect(body.match(/\.site-inner\{[^}]*max-width:80rem/g)).toHaveLength(1);
+  expect(body).not.toMatch(/(header|\.site-header)[^{}]*\.site-inner\{[^}]*(max-width|padding)/);
+  expect(body).toContain(".site-brand svg{width:22px");
+  expect(body).toContain(".site-brand svg{width:28px}");
+  expect(body).toContain(".site-brand{font-size:24px");
+  expect(body.includes('class="step-strip step-strip--organizer"')).toBe(organizer);
   expect(body).toContain('<footer class="site-footer">');
   expect(body).toContain('href="/plans">See plans</a>');
   expect(body).toContain('href="/#privacy">Privacy</a>');
@@ -56,7 +71,7 @@ describe("shared header and footer on every screen", () => {
     expectChrome(await res.text());
   });
 
-  it("organizer: unlocked, locked and leaderboard all show the Organizer chip", async () => {
+  it("organizer: unlocked, locked and leaderboard all show the Organizer step strip", async () => {
     const s = await createSession(env.DB, 2);
     const o = s.organizer_link_token;
     expectChrome(await (await get(`/o/${o}`)).text(), true);
@@ -65,7 +80,7 @@ describe("shared header and footer on every screen", () => {
     expectChrome(await (await get(`/o/${o}/leaderboard`)).text(), true);
   });
 
-  it("participant leaderboard has no Organizer chip", async () => {
+  it("participant leaderboard has no Organizer step strip", async () => {
     const s = await createSession(env.DB, 2);
     await lock(s.organizer_link_token);
     expectChrome(await (await get(`/i/${s.invite_link_token}/leaderboard`)).text());

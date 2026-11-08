@@ -1,5 +1,6 @@
 import { html, raw } from "hono/html";
 import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
+import { stepStrip } from "./ui/components";
 
 // Player-facing invite-link screens, styled per DESIGN.md (direction 2A).
 // Mockups: Desktop D3 (entry), Screens 3B (submitted), 3C (locked).
@@ -12,22 +13,12 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bone);color:var(--ink);font:400 15px/1.5 Archivo,system-ui,-apple-system,"Segoe UI",sans-serif}
 .mono{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
 .head{display:none}
-.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 24px;display:flex;flex-direction:column;gap:24px;min-height:100vh}
+.wrap{max-width:1280px;margin:0 auto;padding:32px 24px 24px;display:flex;flex-direction:column;gap:24px}
 .main{display:flex;flex-direction:column;gap:24px;flex:1;min-width:0}
 .title-row{display:flex;justify-content:space-between;align-items:center;gap:12px}
 h1{margin:0;font-weight:800;font-size:22px;line-height:1.1}
 .sub{margin:0;font-size:14px;line-height:1.5;color:var(--muted)}
 .sub b{color:var(--ink);overflow-wrap:anywhere}
-.chip{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;border-radius:99px;padding:3px 9px;white-space:nowrap;border:1.5px solid transparent}
-.chip.open{background:var(--raffia);color:var(--ink)}
-.chip.submitted{background:var(--indigo);color:var(--bone)}
-.chip.locked{border-color:var(--ink);background:transparent}
-.chip.waiting{border-color:var(--ink);background:var(--paper)}
-.timer{display:flex;flex-direction:column;gap:8px}
-.timer .secs{font:400 36px/1 Anton,Impact,sans-serif}
-.timer .bar{max-width:320px}
-.timer .bar i{width:100%}
-.timer.over .bar i{background:var(--red)}
 .label{font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 form{display:flex;flex-direction:column;gap:24px;margin:0}
 .fields{display:flex;flex-direction:column;gap:12px}
@@ -73,7 +64,6 @@ a:hover{color:var(--red-hover)}
  .wrap{padding:48px 64px;min-height:calc(100vh - 72px);display:grid;grid-template-columns:1fr 340px;column-gap:56px;row-gap:28px;align-content:start}
  .wrap.single{grid-template-columns:minmax(0,640px)}
  .wrap>.main{display:flex;flex-direction:column;gap:28px;min-width:0}
- .title-row .chip{display:none}
  h1{font-size:36px}
  .sub{font-size:16px}
  form{gap:28px}
@@ -99,9 +89,11 @@ const fontLink = raw(
   `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap">`,
 );
 
-type PlayerStatus = "open" | "waiting" | "submitted" | "locked";
+export const PLAYER_STEPS = ["Join", "Pick", "Done"];
+/** 1-based player step: Join (no identity yet), Pick (identity entered), Done (submitted or locked). */
+export type PlayerStep = 1 | 2 | 3;
 
-const shell = (title: string, status: PlayerStatus, main: unknown, side?: unknown, script?: string) => html`<!doctype html>
+const shell = (title: string, step: PlayerStep, main: unknown, side?: unknown, script?: string) => html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -113,6 +105,7 @@ const shell = (title: string, status: PlayerStatus, main: unknown, side?: unknow
   </head>
   <body>
     ${siteHeader()}
+    ${playerStrip(step)}
     <div class="wrap${side ? "" : " single"}">
       <div class="main">${main}</div>
       ${side ?? ""}
@@ -122,10 +115,12 @@ const shell = (title: string, status: PlayerStatus, main: unknown, side?: unknow
   </body>
 </html>`;
 
+export const playerStrip = (step: PlayerStep) => stepStrip({ role: "player", step, total: PLAYER_STEPS.length, labels: PLAYER_STEPS });
+
 const sessionLabel = (sessionId: number, name?: string | null) => name ?? `Session ${sessionId}`;
 
-const titleRow = (sessionId: number, status: PlayerStatus, name?: string | null) =>
-  html`<div class="title-row"><h1>${sessionLabel(sessionId, name)}</h1><span class="chip ${status}">${status}</span></div>`;
+const titleRow = (sessionId: number, name?: string | null) =>
+  html`<div class="title-row"><h1>${sessionLabel(sessionId, name)}</h1></div>`;
 
 // Progressive enhancement: with JS, a single field turns typed picks into pills and emits one hidden
 // `pick` input per pill; without JS the <noscript> block offers plain numbered inputs. The server
@@ -174,45 +169,20 @@ add.addEventListener('click',addPick);
 render();
 })();`;
 
-// Countdown: the client counts down from a server-time offset (data-now vs Date.now()) and re-syncs from the
-// status endpoint every 4s, so it also notices an early Organizer lock. At zero the form is disabled, typed picks stay visible.
-const timerScript = `(function(){
-var t=document.getElementById('timer');if(!t)return;
-var ends=+t.dataset.ends,total=+t.dataset.total*1000,off=+t.dataset.now-Date.now(),over=false;
-var secs=document.getElementById('timersecs'),fill=document.getElementById('timerfill'),up=document.getElementById('timesup'),
-form=document.querySelector('form');
-function finish(){
- if(over)return;over=true;secs.textContent='0 s';fill.style.width='0';t.classList.add('over');
- [].forEach.call(form.querySelectorAll('input,button'),function(e){e.disabled=true});
- var s=document.getElementById('submit');if(s)s.textContent='Time\\u2019s up';
- up.hidden=false;
-}
-function tick(){
- if(over)return;var l=ends-(Date.now()+off);
- if(l<=0){finish();return}
- secs.textContent=Math.ceil(l/1000)+' s';fill.style.width=Math.min(100,l/total*100)+'%';
-}
-function poll(){
- if(over)return;
- fetch(t.dataset.status,{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
-  off=j.now-Date.now();
-  if(j.state==='locked')ends=Math.min(ends,j.now);
-  tick();
- }).catch(function(){});
-}
-tick();setInterval(tick,250);setInterval(poll,4000);
+// Identity remembered across visits, in localStorage keyed by invite token.
+// Pure enhancement: every storage access is guarded, and the server never reads it.
+const identityScript = `(function(){
+var key='mj:id:'+location.pathname.split('/')[2];
+function get(){try{return JSON.parse(localStorage.getItem(key)||'null')}catch(e){return null}}
+function put(e,n){try{localStorage.setItem(key,JSON.stringify({email:e,display_name:n}))}catch(x){}}
+[].forEach.call(document.querySelectorAll('form'),function(f){
+ var e=f.querySelector('input[name=email]'),n=f.querySelector('input[name=display_name]');
+ if(!e||!n)return;
+ var s=get();
+ if(s&&!e.value&&!n.value){e.value=s.email||'';n.value=s.display_name||''}
+ f.addEventListener('submit',function(){if(e.value&&n.value)put(e.value.trim(),n.value.trim())});
+});
 })();`;
-
-// Participants who arrive before the Organizer starts the timer wait here; the page reloads into the pick form once it starts.
-const waitingScript = `(function(){
-var w=document.getElementById('waiting');if(!w)return;
-function poll(){fetch(w.dataset.status,{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){
- if(j.state!=='open')location.reload();
-}).catch(function(){})}
-setInterval(poll,3000);
-})();`;
-
-export type TimerInfo = { endsAt: number; seconds: number; now: number; statusUrl: string };
 
 type FormValues = { email?: string; display_name?: string; picks?: string[] };
 
@@ -222,23 +192,14 @@ export const entryView = (
   v: FormValues = {},
   error?: string,
   name?: string | null,
-  timer?: TimerInfo,
 ) => {
   const picks = (v.picks ?? []).filter((p) => p.trim() !== "");
   const words = pickCount === 1 ? "word or phrase" : "words or phrases";
   return shell(
     sessionLabel(sessionId, name),
-    "open",
-    html`${titleRow(sessionId, "open", name)}
+    v.email && v.display_name ? 2 : 1,
+    html`${titleRow(sessionId, name)}
       <p class="sub">Predict up to ${pickCount} ${words} you expect to hear in the meeting. Type one, press Enter, repeat. Each must be different.</p>
-      ${timer
-        ? html`<div id="timer" class="timer" data-ends="${timer.endsAt}" data-now="${timer.now}" data-total="${timer.seconds}" data-status="${timer.statusUrl}">
-            <div class="label">TIME LEFT</div>
-            <div id="timersecs" class="secs" role="timer">${Math.max(0, Math.ceil((timer.endsAt - timer.now) / 1000))} s</div>
-            <div class="bar" aria-hidden="true"><i id="timerfill"></i></div>
-          </div>
-          <p id="timesup" class="alert" role="alert" hidden>Time’s up. The Session is locked: your picks stay on screen but can’t be changed or submitted. <a href="">Reload</a> for the results screen.</p>`
-        : ""}
       ${error ? html`<p class="alert" role="alert">${error}</p>` : ""}
       <form method="post">
         <div class="fields">
@@ -277,36 +238,20 @@ export const entryView = (
         </div>
       </form>`,
     html`<aside class="side"><div class="label">Your grid</div><div id="sidecount" class="stat">${picks.length} of ${pickCount} picked</div><p class="msg">Editable until the organizer locks the grid.</p></aside>`,
-    timer ? entryScript + timerScript : entryScript,
+    entryScript + identityScript,
   );
 };
 
-/** Before the Organizer starts the timer: the Session name and a wait message; reloads itself into the pick form on start. */
-export const waitingView = (sessionId: number, statusUrl: string, name?: string | null, notice?: string) =>
-  shell(
-    sessionLabel(sessionId, name),
-    "waiting",
-    html`${titleRow(sessionId, "waiting", name)}
-      ${notice ? html`<p class="alert" role="alert">${notice}</p>` : ""}
-      <div id="waiting" class="panel" data-status="${statusUrl}">
-        <div class="label">GET READY</div>
-        <h2>Waiting for the organizer to start.</h2>
-        <p>The pick form opens here by itself when the timer starts. You will get a short countdown, so have your predictions ready.</p>
-      </div>`,
-    undefined,
-    waitingScript,
-  );
-
 /**
- * A submission that arrived after lock or timer end (served as 409): says so plainly and shows what the
+ * A submission that arrived after lock (served as 409): says so plainly and shows what the
  * participant typed, read-only.
  */
-export const timesUpView = (sessionId: number, inviteToken: string, picks: string[], name?: string | null) =>
+export const lockedSubmissionView = (sessionId: number, inviteToken: string, picks: string[], name?: string | null) =>
   shell(
-    "Time’s up",
-    "locked",
-    html`${titleRow(sessionId, "locked", name)}
-      <p class="alert" role="alert">Time’s up. Your grid was not saved: the Session locked before it arrived, and the cutoff is strict.</p>
+    "Session locked",
+    3,
+    html`${titleRow(sessionId, name)}
+      <p class="alert" role="alert">The Session is locked. Your grid was not saved: it arrived after the lock, and the cutoff is strict.</p>
       ${picks.length
         ? html`<div class="picks">
             <div class="label">WHAT YOU TYPED · ${picks.length}</div>
@@ -314,7 +259,7 @@ export const timesUpView = (sessionId: number, inviteToken: string, picks: strin
           </div>`
         : ""}
       <div class="panel">
-        <div class="label">WAITING FOR TRANSCRIPT</div>
+        <div class="label">TRANSCRIPT PENDING</div>
         <h2>Results appear when the organizer scores it.</h2>
         <p>Check back once the transcript is in.</p>
       </div>
@@ -324,8 +269,8 @@ export const timesUpView = (sessionId: number, inviteToken: string, picks: strin
 export const submittedView = (sessionId: number, email: string, displayName: string, picks: string[], name?: string | null) =>
   shell(
     "Grid submitted",
-    "submitted",
-    html`${titleRow(sessionId, "submitted", name)}
+    3,
+    html`${titleRow(sessionId, name)}
       <p class="sub">Thanks, ${displayName}. You’re in as <b>${email}</b>. ${picks.length} ${picks.length === 1 ? "pick" : "picks"}, on record.</p>
       <div class="full">All ${picks.length} picked.</div>
       <div class="picks">
@@ -341,11 +286,11 @@ export const submittedView = (sessionId: number, email: string, displayName: str
 export const lockedView = (sessionId: number, inviteToken: string, name?: string | null) =>
   shell(
     "Session locked",
-    "locked",
-    html`${titleRow(sessionId, "locked", name)}
+    3,
+    html`${titleRow(sessionId, name)}
       <p class="sub">${sessionLabel(sessionId, name)} is locked. The Organizer has locked this Session, so Grids can no longer be submitted or changed. Go sit through the meeting; we’ll score it afterwards.</p>
       <div class="panel">
-        <div class="label">WAITING FOR TRANSCRIPT</div>
+        <div class="label">TRANSCRIPT PENDING</div>
         <h2>Results appear when the organizer scores it.</h2>
         <p>Check back once the transcript is in.</p>
       </div>

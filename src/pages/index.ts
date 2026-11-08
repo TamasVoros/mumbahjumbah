@@ -3,8 +3,8 @@
 export { page, shell } from "./shell";
 export { createForm, PICK_PRESETS } from "./landing";
 export { errorPage, notFoundPage, notOpenYetPage, organizersOnlyPage, notLocked, tooManyRequestsPage } from "./errors";
-export { statusUrl, timerInfo, pickedWords } from "./player";
+export { pickedWords } from "./player";
 export { leaderboardPage } from "./leaderboard";
 export { plansPage } from "../plans";
-export { entryView, lockedView, submittedView, timesUpView, waitingView } from "../player-ui";
+export { entryView, lockedSubmissionView, lockedView, submittedView } from "../player-ui";
 export { organizerView } from "../organizer";

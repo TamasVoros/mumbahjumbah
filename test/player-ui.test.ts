@@ -48,31 +48,31 @@ describe("invite-link screens follow DESIGN.md", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("sam@acme.co");
-    expect(html).toContain("submitted");
+    expect(html).not.toContain('class="chip submitted"');
     expect(html).toContain('<li class="pill">synergy</li>');
     expect(html).toContain("YOUR PICKS · 2 / 2");
     expect(html).toContain("Edit your Grid");
   });
 
-  it("locked: waiting-for-transcript view, 403 on GET", async () => {
+  it("locked: transcript-pending view, 403 on GET", async () => {
     const s = await createSession(env.DB, 2);
     await lockSession(env.DB, s.organizer_link_token);
     const res = await SELF.fetch(url(s.invite_link_token));
     expect(res.status).toBe(403);
     const html = await res.text();
-    expect(html).toContain("WAITING FOR TRANSCRIPT");
+    expect(html).toContain("TRANSCRIPT PENDING");
     expect(html).toContain("locked");
     expect(html).toContain("/leaderboard");
   });
 
-  it("late submit: 409 time's-up view that keeps the typed picks read-only", async () => {
+  it("late submit: 409 locked view that keeps the typed picks read-only", async () => {
     const s = await createSession(env.DB, 2);
     await lockSession(env.DB, s.organizer_link_token);
     const res = await post(s.invite_link_token, ["alpha", "beta"]);
     expect(res.status).toBe(409);
     const html = await res.text();
-    expect(html).toContain("Time’s up");
-    expect(html).toContain("WAITING FOR TRANSCRIPT");
+    expect(html).toContain("The Session is locked");
+    expect(html).toContain("TRANSCRIPT PENDING");
     expect(html).toContain("alpha");
     expect(html).toContain("beta");
     expect(html).not.toContain('name="pick"');

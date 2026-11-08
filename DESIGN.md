@@ -82,7 +82,7 @@ Focus ring: `1.5px indigo` border + `0 0 0 3px rgba(31,47,99,.12)` (4px on deskt
   <path d="M32 54L38 64L32 76L26 64Z" fill="CUT"/>
 </svg>
 ```
-FILL = bone on indigo (or indigo on bone); CUT = the ground colour. Size 18×24 in headers, 22×29 on marketing. Wordmark "MumbahJumbah" Archivo 800, 17–20px, 8–10px right of the mark.
+FILL = bone on indigo (or indigo on bone); CUT = the ground colour. Size in headers: 22px wide on mobile, 28px wide from 900px up (height follows the 64:84 ratio); 22×29 on marketing. Wordmark "MumbahJumbah" Archivo 800, 20px on mobile and 24px from 900px up, 8–10px right of the mark. (Sizes raised from 18px / 17–20px in #42, approved by the user.) The header carries a hamburger menu on the right (44px hit area, indigo ground, bone text, 2px radius, flat) and no status pills.
 
 **Zigzag** — tile 16 × 16, repeat-x, height 16:
 ```css

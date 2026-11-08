@@ -15,6 +15,10 @@ Reverse Bingo v1 on Cloudflare Workers + Hono + D1. See `CONTEXT.md` and `docs/a
 4. The Organizer uploads the meeting transcript (.txt or .vtt). It is read in memory and discarded; only counts for picked terms are kept.
 5. Everyone opens /i/token/leaderboard (or the Organizer /o/token/leaderboard) to see scores, and the Recap Card PNG link to download and post it in Slack.
 
+## Demo session for UI review
+
+In Claude Code, just type `/demo` (or `/demo locked`, `/demo scored`): it starts the server, seeds the session and prints the links. By hand: with `npm run dev` running, `npm run seed:demo` (re)creates a fixed local Session with static tokens and 7 participants, so the UI can be checked the same way after every change. `-- --stage open|locked|scored` picks how far to take it (default `open`; `scored` also uploads `scripts/demo/transcript.vtt`, 1,300+ words). Organizer: `/o/demo-organizer-00000000000000000000000000000000`, Invite: `/i/demo-invite-0000000000000000000000000000000000`. Local only.
+
 Scripts: `dev`, `test`, `typecheck`, `deploy`, `migrate:local`, `migrate:remote`.
 
 ## Shipping (Phase 1: one environment)

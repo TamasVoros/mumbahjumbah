@@ -39,7 +39,8 @@ describe("Create Session", () => {
 
   it("inline script fills the number input for 5/10 and switches to Custom when typing", async () => {
     const body = await (await SELF.fetch("https://example.com/")).text();
-    const script = /<script[^>]*>([\s\S]*?)<\/script>/.exec(body)![1]!;
+    // The header carries its own <script type="module">; pick the landing form script (plain <script>, possibly with a nonce).
+    const script = /<script(?![^>]*type=)[^>]*>([\s\S]*?)<\/script>/.exec(body)![1]!;
     const input = { value: "7" };
     const custom = { checked: true };
     let onChange: (e: unknown) => void = () => {};

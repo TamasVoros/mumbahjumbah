@@ -1,29 +1,46 @@
+import { getJargonResult } from "./jargon";
+import { scoreSession, type PickValue } from "./scoring";
+
 export type LeaderboardEntry = {
   rank: number;
   participantId: number;
   displayName: string;
   score: number;
+  hits: number;
+  picks: PickValue[];
 };
 
 /**
- * Ranked leaderboard for a Session, computed live from its current Jargon Result.
- * Score = sum of occurrences of each distinct Pick present in the Jargon Result (picks are a set,
- * so no double counting). Zero-score participants are included. Ordering: score desc, then
- * submission order (participants.id, assigned at first submission; resubmitting keeps the row and
- * therefore the position). Ranks are positional (1..n); tied scores are not given a shared rank.
+ * Ranked leaderboard for a Session, computed live from its current Jargon Result and Grids using
+ * the scoring in src/scoring.ts (ADR-0005). Zero-score participants are included. Ordering:
+ * score desc, then hits desc (picks present in the Jargon Result), then submission order
+ * (participants.id, assigned at first submission; resubmitting keeps the row and therefore the
+ * position). Ranks are positional (1..n); tied entries are not given a shared rank.
  */
 export async function getLeaderboard(db: D1Database, sessionId: number): Promise<LeaderboardEntry[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT p.id AS id, p.display_name AS display_name, COALESCE(SUM(j.occurrences), 0) AS score
-       FROM participants p
-       LEFT JOIN picks pk ON pk.participant_id = p.id
-       LEFT JOIN jargon_results j ON j.session_id = p.session_id AND j.term = pk.pick
-       WHERE p.session_id = ?
-       GROUP BY p.id
-       ORDER BY score DESC, p.id ASC`,
-    )
-    .bind(sessionId)
-    .all<{ id: number; display_name: string; score: number }>();
-  return results.map((r, i) => ({ rank: i + 1, participantId: r.id, displayName: r.display_name, score: r.score }));
+  const [jargon, participants, picks] = await Promise.all([
+    getJargonResult(db, sessionId),
+    db
+      .prepare("SELECT id, display_name FROM participants WHERE session_id = ? ORDER BY id")
+      .bind(sessionId)
+      .all<{ id: number; display_name: string }>(),
+    db
+      .prepare(
+        `SELECT pk.participant_id AS pid, pk.pick AS pick FROM picks pk
+         JOIN participants p ON p.id = pk.participant_id WHERE p.session_id = ? ORDER BY pk.participant_id, pk.rowid`,
+      )
+      .bind(sessionId)
+      .all<{ pid: number; pick: string }>(),
+  ]);
+  const byParticipant = new Map<number, string[]>();
+  for (const r of picks.results) byParticipant.set(r.pid, [...(byParticipant.get(r.pid) ?? []), r.pick]);
+
+  const { scores } = scoreSession(
+    jargon,
+    participants.results.map((p) => ({ participantId: p.id, picks: byParticipant.get(p.id) ?? [] })),
+  );
+  const names = new Map(participants.results.map((p) => [p.id, p.display_name]));
+  return scores
+    .sort((a, b) => b.score - a.score || b.hits - a.hits || a.participantId - b.participantId)
+    .map((s, i) => ({ rank: i + 1, displayName: names.get(s.participantId)!, ...s }));
 }

@@ -13,23 +13,23 @@ The tenant/account that owns a group of Sessions — the thing a facilitator or 
 _Avoid_: Account, tenant, team (reserve for later multi-Operator/cross-Operator framing if needed)
 
 **Organizer**:
-The person who creates a Session, sets its Pick Count, and starts/locks it. Belongs to exactly one Operator. In v1, the sole Operator is also the only Organizer, so the two collapse into one person — kept as separate concepts so Approach B (an Operator with multiple staff each organizing sessions) doesn't require renaming anything later.
+The person who creates a Session, sets its Pick Count, and locks it. Belongs to exactly one Operator. In v1, the sole Operator is also the only Organizer, so the two collapse into one person — kept as separate concepts so Approach B (an Operator with multiple staff each organizing sessions) doesn't require renaming anything later.
 _Avoid_: Host, admin, operator (Organizer is a per-Session role; Operator is the account)
 
 **Session Name**:
-A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked (when the timer arrives, until it starts). Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
+A label (trimmed, 1-80 characters) the Organizer sets on the Organizer page right after creating a Session; Participants see it on their pages and it titles the Organizer page. It gates the Invite Link: the link is neither generated for display nor usable (it shows a "not open yet" page, not a 404) until a name is saved. Editable until the Session is locked; it freezes at lock. Sessions that predate the name are grandfathered open as "Untitled session". Distinct from **Display Name**, which is a Participant's label.
 _Avoid_: Title, session title (Display Name is the Participant's, not this)
 
-**Pick Timer**:
-A 30-60 second (default 30) countdown the Organizer starts once the Session has a name. States: setup (no name), open (named, timer not started: Participants see a waiting screen), picking (timer running: Participants see the pick form and a synced countdown), locked. The timer ending and **Lock & Start Session!** are the same locked state; Lock & Start works before the timer starts, while it runs (stopping it) and after it ended. Fixed once started (no pause or extend; the name is frozen too). The server enforces it lazily on every request (`now >= timer_ends_at` persists `locked_at = timer_ends_at`); a late submission gets a 409 with the typed picks shown read-only. Strict cutoff, no grace window.
-_Avoid_: Countdown (the participant-side display of it), deadline
+**Lock & Start Session!**:
+The Organizer's button that locks the Session, and the only way picking ends: there is no timer or deadline. A Session moves setup (no name) → open (named, Invite Link live: Participants enter Email and Display Name and pick in one pass, so they can submit as soon as the Session is named) → locked. Submissions are accepted while the Session is not locked; a submission after lock gets a 409 with the typed picks shown read-only. The Session Name freezes at lock. See [ADR-0004](docs/adr/0004-remove-pick-timer.md).
+_Avoid_: Start (it does not begin picking; the Invite Link going live does), close
 
 **Invite Link**:
 The public, unauthenticated link shared with Participants to open a Session and submit a Grid. Grants no Organizer actions.
 _Avoid_: Session link, the link (ambiguous with Organizer Link)
 
 **Organizer Link**:
-A separate, private, unguessable link generated alongside the Invite Link when a Session is created. Only this link can start/lock the Session or upload its Transcript — the only thing gating Organizer actions in v1, since there's no login at all. A later phase replaces this with real authenticated access (and audit logging of Organizer actions) rather than link-secrecy.
+A separate, private, unguessable link generated alongside the Invite Link when a Session is created. Only this link can lock the Session or upload its Transcript — the only thing gating Organizer actions in v1, since there's no login at all. A later phase replaces this with real authenticated access (and audit logging of Organizer actions) rather than link-secrecy.
 _Avoid_: Admin link, invite link (the two links grant different, non-overlapping capabilities)
 
 **Participant**:
@@ -49,7 +49,7 @@ A Participant's set of 1 up to Pick Count distinct Picks for a Session. Purely a
 _Avoid_: Card, board, picks (picks are the words themselves, the grid is the container)
 
 **Pick Count**:
-The maximum number of Picks a Grid may contain for a given Session, set by the Organizer when creating the Session (labelled "Maximum picks"; any integer from 1 to 100 is valid, not constrained to a perfect square). A Grid holds between 1 and Pick Count Picks; Score is unchanged (sum of occurrence counts), so fewer Picks simply means fewer chances to score. See [ADR-0003](docs/adr/0003-pick-count-is-a-maximum.md). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
+The maximum number of Picks a Grid may contain for a given Session, set by the Organizer when creating the Session (labelled "Maximum picks"; any integer from 1 to 100 is valid, not constrained to a perfect square). A Grid holds between 1 and Pick Count Picks; fewer Picks simply means fewer chances to score. See [ADR-0003](docs/adr/0003-pick-count-is-a-maximum.md). Replaces the earlier "3x3 or 5x5 grid size" framing, which wrongly implied a square dimension mattered.
 _Avoid_: Grid size, dimensions (no x/y shape exists in the model)
 
 **Pick**:
@@ -65,7 +65,7 @@ The persisted, derived term-frequency data extracted from a Transcript via bound
 _Avoid_: Frequency data, word counts (acceptable informally, but Jargon Result is canonical when referring to the stored artifact), word-frequency (use term-frequency — Picks aren't always single words)
 
 **Score**:
-A Participant's total for a Session: the sum of transcript occurrence counts for each distinct Pick that appears at least once in the Jargon Result (after stopword filtering, for single-word Picks).
+A Participant's total for a Session: the sum of the **values** of their Picks. A term's value is the same for everyone who picked it: `round(10 × log2(1 + occurrences) × phrase × rarity)`, where phrase is 1.5 for a multi-word Pick (else 1) and rarity is `max(1 − share of participants who picked it, 0.1)` (1 when the Session has fewer than 4 participants). Values are rounded per term before summing; a Pick absent from the Jargon Result is worth 0; misses carry no penalty. Ties break on hits (Picks present in the Jargon Result), then submission order. See [ADR-0005](docs/adr/0005-scoring-v2-term-values.md).
 _Avoid_: Points, rank (rank is derived from Score, not the same thing)
 
 **Recap Card**:

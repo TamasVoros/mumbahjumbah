@@ -1,6 +1,6 @@
 import { SELF, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { createSession as createNamed, createWaitingSession } from "./helpers";
+import { createSession as createNamed } from "./helpers";
 import { createSession } from "../src/sessions";
 
 const postName = (token: string, name: string) =>
@@ -33,26 +33,48 @@ describe("Session Name gates the Invite Link", () => {
     expect(await nameOf(s.id)).toBe("Q3 all-hands");
   });
 
-  it("renders the name as an inline title input, with no name card, button or Session <id> fallback", async () => {
+  it("stage 1 shows only the strip, heading, name field and Save button", async () => {
     const s = await createSession(env.DB, 3);
     const body = await getOrganizer(s.organizer_link_token);
-    expect(body).toMatch(/<h1><input class="title-input" name="name" type="text" maxlength="80" required/);
-    expect(body).toContain('placeholder="Name your session"');
-    expect(body).toContain('value=""');
-    expect(body).not.toContain(`Session ${s.id}`);
-    expect(body).not.toContain("Save name");
-    expect(body).not.toContain('id="session-name"');
-    expect(body).not.toContain('class="toast"');
+    expect(body).toContain("<b>Organizer</b> · 1/4 · Name");
+    expect(body).toContain("<h1>Name your session</h1>");
+    expect(body).toContain("Participants see this on their pages.");
+    expect(body).toContain('<label class="label" for="session-name">Session name</label>');
+    expect(body).toMatch(/<input id="session-name" class="name-input" name="name" type="text" maxlength="80" required\s+autocomplete="off" autofocus placeholder="e\.g\. Q3 All-Hands"/);
+    expect(body).toContain('class="pencil"');
+    expect(body).toContain("Save and continue");
+    expect(body).toContain('class="zigzag');
+    for (const gone of [">SETUP<", 'class="stats', "<table", "invite-title", "Lock &amp; Start", 'class="title-input"', "data-name-form", "requestSubmit(", `Session ${s.id}`, 'class="toast"']) {
+      expect(body).not.toContain(gone);
+    }
+  });
+
+  it("stage 1 re-renders with an error toast on a bad name, and advances to stage 2 on a good one", async () => {
+    const s = await createSession(env.DB, 3);
+    const bad = await postName(s.organizer_link_token, "");
+    expect(bad.status).toBe(400);
+    const badBody = await bad.text();
+    expect(badBody).toMatch(/<p class="toast" role="alert">Session name must be 1 to 80 characters\./);
+    expect(badBody).toContain('id="session-name"');
+    const ok = await (await postName(s.organizer_link_token, "Retro")).text();
+    expect(ok).toContain("2/4");
+    expect(ok).toContain('class="title-input"');
+    expect(ok).toContain('class="pencil"');
+    expect(ok).toContain("Lock &amp; Start Session!");
+    expect(ok).not.toContain('id="session-name"');
+  });
+
+  it("stage 2 title is the inline input with pencil affordance and blur-save", async () => {
+    const s = await createNamed(env.DB, 2, "Editable");
+    const body = await getOrganizer(s.organizer_link_token);
+    expect(body).toMatch(/<h1 class="title-wrap"><input class="title-input" name="name" type="text" maxlength="80" required/);
+    expect(body).toContain('class="pencil"');
     expect(body).toContain("requestSubmit");
   });
 
-  it("shows the title as a plain h1 once the timer starts or the Session is locked", async () => {
-    const s = await createWaitingSession(env.DB, 2, "Plain title");
+  it("shows the title as a plain h1 once the Session is locked", async () => {
+    const s = await createNamed(env.DB, 2, "Plain title");
     expect(await getOrganizer(s.organizer_link_token)).toContain('value="Plain title"');
-    await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/timer`, { method: "POST" });
-    const picking = await getOrganizer(s.organizer_link_token);
-    expect(picking).toContain("<h1>Plain title</h1>");
-    expect(picking).not.toContain('class="title-input"');
     await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/lock`, { method: "POST" });
     const locked = await getOrganizer(s.organizer_link_token);
     expect(locked).toContain("<h1>Plain title</h1>");
@@ -111,11 +133,9 @@ describe("Session Name gates the Invite Link", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("<h1>Standup</h1>");
-    // Named but the timer isn't running yet: participants wait, no pick form.
-    expect(body).toContain('id="waiting"');
-    expect(body).not.toContain('id="pickapp"');
-    await SELF.fetch(`https://example.com/o/${s.organizer_link_token}/timer`, { method: "POST" });
-    expect(await (await SELF.fetch(`https://example.com/i/${s.invite_link_token}`)).text()).toContain('id="pickapp"');
+    // Named is enough: the pick form is there with no timer to start.
+    expect(body).toContain('name="display_name"');
+    expect(body).toContain('id="pickapp"');
 
     const submit = await SELF.fetch(`https://example.com/i/${s.invite_link_token}`, {
       method: "POST",

@@ -6,7 +6,7 @@ import { logoMarkSvg } from "./logo";
 import { brandHead } from "./chrome";
 
 /** Replaces the bare `page()` in src/index.ts. */
-export const shell = (title: string, body: unknown, opts: { board?: boolean; wide?: boolean; organizer?: boolean } = {}) => html`<!doctype html>
+export const shell = (title: string, body: unknown, opts: { board?: boolean; wide?: boolean; strip?: unknown } = {}) => html`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -16,7 +16,8 @@ export const shell = (title: string, body: unknown, opts: { board?: boolean; wid
     <style>${raw(CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body class="${opts.board ? "board" : ""}">
-    ${siteHeader({ organizer: opts.organizer })}
+    ${siteHeader()}
+    ${opts.strip ?? ""}
     <main class="screen ${opts.wide ? "screen--wide" : ""}">${body}</main>
     ${siteFooter()}
   </body>
@@ -40,6 +41,26 @@ export const wordmark = (onIndigo = false) =>
 
 /** Only directly above a committing action. Use card=true inside a bordered card. */
 export const zigzag = (card = false) => html`<div class="zigzag ${card ? "zigzag--card" : ""}" role="presentation"></div>`;
+
+/**
+ * Progress strip directly below the nav. Organizer: mono label `ORGANIZER · 2/5 · Name` plus one bar segment per
+ * stage. Player: the labelled steps themselves. `step` is 1-based; segments are not links. Styles live in CHROME_CSS.
+ */
+export const stepStrip = ({ role, step, total, labels }: { role: "organizer" | "player"; step: number; total: number; labels: string[] }) => {
+  const items = Array.from({ length: total }, (_, i) => {
+    const n = i + 1;
+    const state = n < step ? "done" : n === step ? "current" : "upcoming";
+    const text = labels[i] ?? `Step ${n}`;
+    const sr = html`<span class="step-strip__sr">Step ${n} of ${total}: ${text}${state === "done" ? " (done)" : state === "current" ? " (current)" : ""}</span>`;
+    return html`<li class="is-${state}"${state === "current" ? raw(' aria-current="step"') : ""}>${role === "player" ? html`<span aria-hidden="true">${text}</span>${sr}` : sr}</li>`;
+  });
+  return html`<nav class="step-strip step-strip--${role}" aria-label="Progress"><div class="step-strip__in">
+    ${role === "organizer"
+      ? html`<p class="step-strip__label" aria-hidden="true"><b>Organizer</b> · ${step}/${total} · ${labels[step - 1] ?? ""}</p>`
+      : html`<p class="step-strip__label" aria-hidden="true"><b>Player</b></p>`}
+    <ol class="step-strip__steps">${items}</ol>
+  </div></nav>`;
+};
 
 export type ChipKind = "open" | "submitted" | "pending" | "locked" | "scored" | "private";
 export const chip = (kind: ChipKind, text = kind.toUpperCase()) => html`<span class="chip chip--${kind}">${text}</span>`;

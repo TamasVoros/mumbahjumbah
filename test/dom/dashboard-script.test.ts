@@ -2,10 +2,8 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { dashboardPanel, type DashboardStatus } from "../../src/dashboard-ui";
 
-const status = (rows: DashboardStatus["participants"], state: DashboardStatus["state"] = "picking"): DashboardStatus => ({
+const status = (rows: DashboardStatus["participants"], state: DashboardStatus["state"] = "open"): DashboardStatus => ({
   state,
-  now: 0,
-  timerEndsAt: null,
   participants: rows,
   stats: { participants: rows.length, medianPicks: rows.length ? 2.5 : 0, uniquePicks: rows.length * 2 },
 });
@@ -31,12 +29,12 @@ const load = (initial: DashboardStatus, next: DashboardStatus) => {
 
 describe("dashboard polling script", () => {
   it("fills the table and cards in place from the status JSON, without reload", async () => {
-    const t = load(status([]), status([{ name: "Ann <b>", submitTime: "5.0", picks: 3 }, { name: "Bob", submitTime: "???", picks: 2 }]));
+    const t = load(status([]), status([{ name: "Ann <b>", picks: 3 }, { name: "Bob", picks: 2 }]));
     expect(t.doc.querySelector("table")!.hidden).toBe(true);
     expect(t.doc.querySelector<HTMLElement>("[data-empty]")!.hidden).toBe(false);
     await t.poll();
     const rows = [...t.doc.querySelectorAll("tbody tr")].map((tr) => [...tr.children].map((td) => td.textContent));
-    expect(rows).toEqual([["Ann <b>", "5.0", "3"], ["Bob", "???", "2"]]);
+    expect(rows).toEqual([["Ann <b>", "3"], ["Bob", "2"]]);
     expect(t.doc.querySelector("tbody b")).toBeNull(); // names are text, never markup
     expect(t.doc.querySelector("table")!.hidden).toBe(false);
     expect(t.doc.querySelector<HTMLElement>("[data-empty]")!.hidden).toBe(true);

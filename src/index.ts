@@ -9,6 +9,7 @@ import { getJargonResult, processTranscript } from "./jargon";
 import {
   createForm,
   entryView,
+  lockedSubmissionView,
   leaderboardPage,
   lockedView,
   notFoundPage,
@@ -19,12 +20,8 @@ import {
   pickedWords,
   PICK_PRESETS,
   plansPage,
-  statusUrl,
   submittedView,
-  timerInfo,
-  timesUpView,
   tooManyRequestsPage,
-  waitingView,
 } from "./pages";
 import {
   createSession,
@@ -33,13 +30,8 @@ import {
   lockSession,
   parsePickCount,
   parseSessionName,
-  parseTimerSeconds,
   renameSession,
   sessionState,
-  startTimer,
-  DEFAULT_TIMER_SECONDS,
-  MAX_TIMER_SECONDS,
-  MIN_TIMER_SECONDS,
   type Session,
 } from "./sessions";
 
@@ -140,60 +132,44 @@ app.post("/sessions", async (c) => {
   return c.redirect(`/o/${session.organizer_link_token}`, 303);
 });
 
-// Small JSON status for the participant pages (waiting screen and countdown). Never cached (see the /i/ rule above).
+// Small JSON status for the participant pages: open or locked. Never cached (see the /i/ rule above).
 app.get("/i/:token/status", async (c) => {
-  const now = Date.now();
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.json({ state: "unknown" }, 404);
-  const state = sessionState(session, now);
+  const state = sessionState(session);
   if (state === "setup") return c.json({ state }, 403);
-  return c.json({
-    state,
-    now,
-    endsAt: state === "picking" ? Date.parse(session.timer_ends_at ?? "") : null,
-    seconds: session.timer_seconds,
-  });
+  return c.json({ state });
 });
 
 app.get("/i/:token", async (c) => {
-  const now = Date.now();
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(notFoundPage(), 404);
-  const state = sessionState(session, now);
+  const state = sessionState(session);
   if (state === "setup") return c.html(notOpenYetPage(), 403);
   if (state === "locked") return c.html(lockedView(session.id, session.invite_link_token, session.name), 403);
-  if (state === "open") return c.html(waitingView(session.id, statusUrl(session), session.name));
-  return c.html(entryView(session.id, session.pick_count, {}, undefined, session.name, timerInfo(session, now)));
+  return c.html(entryView(session.id, session.pick_count, {}, undefined, session.name));
 });
 
 app.post("/i/:token", async (c) => {
-  const now = Date.now();
-  const session = await findByInviteToken(c.env.DB, c.req.param("token"), now);
+  const session = await findByInviteToken(c.env.DB, c.req.param("token"));
   if (!session) return c.html(notFoundPage(), 404);
-  const state = sessionState(session, now);
+  const state = sessionState(session);
   if (state === "setup") return c.html(notOpenYetPage(), 403);
-  if (state === "open") {
-    return c.html(waitingView(session.id, statusUrl(session), session.name, "The organizer hasn’t started the timer yet, so nothing was saved."), 409);
-  }
   const raw = await c.req.parseBody({ all: true });
-  // Strict cutoff: after lock or timer end the submission is rejected before validation, and what was typed is shown back read-only.
+  const str = (k: string) => (typeof raw[k] === "string" ? (raw[k] as string) : "");
+  const typed = { email: str("email"), display_name: str("display_name"), picks: pickedWords(raw) };
+  // Strict cutoff: after lock the submission is rejected before validation, and what was typed is shown back read-only.
   if (state === "locked") {
-    return c.html(timesUpView(session.id, session.invite_link_token, pickedWords(raw), session.name), 409);
+    return c.html(lockedSubmissionView(session.id, session.invite_link_token, typed.picks, session.name), 409);
   }
   const result = validateGrid(raw, session.pick_count);
   if (!result.ok) {
-    const picks = pickedWords(raw);
-    const values = {
-      email: typeof raw["email"] === "string" ? raw["email"] : "",
-      display_name: typeof raw["display_name"] === "string" ? raw["display_name"] : "",
-      picks,
-    };
-    return c.html(entryView(session.id, session.pick_count, values, result.error, session.name, timerInfo(session, now)), 400);
+    return c.html(entryView(session.id, session.pick_count, typed, result.error, session.name), 400);
   }
   // Design decision (#18): mockup 8A's 409 "duplicate email" screen is intentionally NOT implemented.
   // Resubmitting under the same email is a deliberate edit/upsert, not an error.
-  if (!(await saveGrid(c.env.DB, session.id, result.value, now))) {
-    return c.html(timesUpView(session.id, session.invite_link_token, result.value.picks, session.name), 409);
+  if (!(await saveGrid(c.env.DB, session.id, result.value))) {
+    return c.html(lockedSubmissionView(session.id, session.invite_link_token, result.value.picks, session.name), 409);
   }
   return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks, session.name));
 });
@@ -211,16 +187,19 @@ app.get("/o/:token", async (c) => {
   const token = c.req.param("token");
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
+  // A scored Session lives on the leaderboard (stage 4); ?step=transcript reopens stage 3 to re-score.
+  if (session.locked_at && c.req.query("step") !== "transcript" && (await getJargonResult(c.env.DB, session.id)).length > 0) {
+    return c.redirect(`/o/${token}/leaderboard`, 303);
+  }
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin));
 });
 
 // Live dashboard data, polled by the Organizer page. Organizer token only (invite token 403, unknown 404); names, never emails.
 app.get("/o/:token/status", async (c) => {
   const token = c.req.param("token");
-  const now = Date.now();
-  const session = await findByOrganizerToken(c.env.DB, token, now);
+  const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
-  return c.json(await getDashboardStatus(c.env.DB, session, now), 200, { "cache-control": "no-store" });
+  return c.json(await getDashboardStatus(c.env.DB, session), 200, { "cache-control": "no-store" });
 });
 
 // Only an Organizer Link token can name the Session; editable until lock. Reveals the Invite Link once saved.
@@ -229,9 +208,8 @@ app.post("/o/:token/name", async (c) => {
   const existing = await findByOrganizerToken(c.env.DB, token);
   if (!existing) return organizerMissing(c, token);
   const origin = new URL(c.req.url).origin;
-  if (existing.locked_at || existing.timer_started_at) {
-    const why = existing.locked_at ? "The Session is locked" : "The timer has started";
-    return c.html(await organizerView(c.env.DB, existing, token, origin, { error: `${why}, so its name can’t change.` }), 409);
+  if (existing.locked_at) {
+    return c.html(await organizerView(c.env.DB, existing, token, origin, { error: "The Session is locked, so its name can’t change." }), 409);
   }
   const form = await c.req.parseBody();
   const name = parseSessionName(form["name"]);
@@ -244,26 +222,6 @@ app.post("/o/:token/name", async (c) => {
   const session = await renameSession(c.env.DB, token, name);
   if (!session) return c.html(await organizerView(c.env.DB, existing, token, origin), 409);
   return c.html(await organizerView(c.env.DB, session, token, origin, { ok: "Name saved. Invite link ready." }));
-});
-
-// Only an Organizer Link token can start the pick timer: needs a name, 30-60 s (default 30), and it is fixed once started.
-app.post("/o/:token/timer", async (c) => {
-  const token = c.req.param("token");
-  const now = Date.now();
-  const existing = await findByOrganizerToken(c.env.DB, token, now);
-  if (!existing) return organizerMissing(c, token);
-  const origin = new URL(c.req.url).origin;
-  const fail = async (error: string, status: 400 | 409) =>
-    c.html(await organizerView(c.env.DB, existing, token, origin, { error }), status);
-  if (existing.locked_at) return fail("The Session is locked, so the timer can’t start.", 409);
-  if (existing.timer_started_at) return fail("The timer has already started and can’t be changed.", 409);
-  if (existing.name === null) return fail("Name the Session before starting the timer.", 409);
-  const form = await c.req.parseBody();
-  const seconds = form["seconds"] === undefined ? DEFAULT_TIMER_SECONDS : parseTimerSeconds(form["seconds"]);
-  if (seconds === null) return fail(`Timer length must be a whole number from ${MIN_TIMER_SECONDS} to ${MAX_TIMER_SECONDS} seconds.`, 400);
-  const session = await startTimer(c.env.DB, token, seconds, now);
-  if (!session) return fail("The timer could not be started.", 409);
-  return c.html(await organizerView(c.env.DB, session, token, origin, { ok: `Timer started: ${seconds} seconds.` }));
 });
 
 // Only an Organizer Link token can lock; Invite Link tokens never match here. A nameless Session can't lock.
@@ -306,7 +264,7 @@ app.post("/o/:token/transcript", async (c) => {
   }
   const res = await processTranscript(c.env.DB, session.id, file);
   if (!res.ok) return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin, { error: res.error }), 400);
-  return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin, { ok: "Transcript processed and discarded. Jargon Result updated." }));
+  return c.redirect(`/o/${token}/leaderboard?scored=1`, 303);
 });
 
 // Each route resolves only its own token type, so neither link grants the other's capabilities.
@@ -322,7 +280,7 @@ app.get("/o/:token/leaderboard", async (c) => {
   const session = await findByOrganizerToken(c.env.DB, token);
   if (!session) return organizerMissing(c, token);
   if (!session.locked_at) return c.html(notLocked(), 409);
-  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`, true));
+  return c.html(await leaderboardPage(c.env.DB, session, `/o/${session.organizer_link_token}/recap.png`, { token, scored: c.req.query("scored") === "1" }));
 });
 
 const recap = async (db: D1Database, session: Session) => {

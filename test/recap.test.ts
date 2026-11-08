@@ -29,8 +29,8 @@ describe("renderRecapPng", () => {
   it("renders a PNG for a known fixture without throwing", async () => {
     const png = await renderRecapPng(
       [
-        { rank: 1, participantId: 1, displayName: "Bold", score: 5 },
-        { rank: 2, participantId: 2, displayName: "Zero", score: 0 },
+        { rank: 1, participantId: 1, displayName: "Bold", score: 5, hits: 0, picks: [] },
+        { rank: 2, participantId: 2, displayName: "Zero", score: 0, hits: 0, picks: [] },
       ],
       [{ term: "synergy", occurrences: 3 }, { term: "ai", occurrences: 2 }],
     );
@@ -48,7 +48,7 @@ const be32 = (b: Uint8Array, o: number) => ((b[o]! << 24) | (b[o + 1]! << 16) | 
 describe("recap PNG dimensions", () => {
   it("is 1200x630", async () => {
     const png = await renderRecapPng(
-      [{ rank: 1, participantId: 1, displayName: "Marcus", score: 58 }],
+      [{ rank: 1, participantId: 1, displayName: "Marcus", score: 58, hits: 0, picks: [] }],
       [{ term: "synergy", occurrences: 7 }],
     );
     expect(be32(png, 16)).toBe(1200);
@@ -58,10 +58,10 @@ describe("recap PNG dimensions", () => {
 
 describe("recapLayout", () => {
   const board = [
-    { rank: 1, participantId: 1, displayName: "Marcus", score: 58 },
-    { rank: 2, participantId: 2, displayName: "Priya", score: 41 },
-    { rank: 3, participantId: 3, displayName: "Jo", score: 33 },
-    { rank: 4, participantId: 4, displayName: "Fourth", score: 1 },
+    { rank: 1, participantId: 1, displayName: "Marcus", score: 58, hits: 0, picks: [] },
+    { rank: 2, participantId: 2, displayName: "Priya", score: 41, hits: 0, picks: [] },
+    { rank: 3, participantId: 3, displayName: "Jo", score: 33, hits: 0, picks: [] },
+    { rank: 4, participantId: 4, displayName: "Fourth", score: 1, hits: 0, picks: [] },
   ];
 
   it("shows headline, stat line with the most-said word, and only the top 3", () => {
@@ -76,6 +76,15 @@ describe("recapLayout", () => {
     expect(t).toContain("4 PLAYERS");
     expect(t).toContain("PREDICT THE JARGON. WIN THE MEETING.");
     expect(t).toContain("MUMBAHJUMBAH.COM");
+  });
+
+  it("shows the most-said word's value alongside, ranking by raw occurrences", () => {
+    const withPicks = [
+      { rank: 1, participantId: 1, displayName: "Marcus", score: 20, hits: 2, picks: [{ term: "a", occurrences: 1, value: 10 }, { term: "synergy", occurrences: 7, value: 30 }] },
+    ];
+    const t = text(recapLayout(withPicks, [{ term: "a", occurrences: 1 }, { term: "synergy", occurrences: 7 }]));
+    expect(t).toContain("“synergy”");
+    expect(t).toContain("7 times, worth 30");
   });
 
   it("keeps a non-collapsible space between the label and the bold word", () => {

@@ -3,11 +3,9 @@ import { html, raw } from "hono/html";
 // Kept free of D1/session imports so the browser-side (jsdom) test can load it without the Workers types.
 export const POLL_MS = 4000;
 
-export type DashboardRow = { name: string; submitTime: string; picks: number };
+export type DashboardRow = { name: string; picks: number };
 export type DashboardStatus = {
-  state: "setup" | "open" | "picking" | "locked";
-  now: number;
-  timerEndsAt: number | null;
+  state: "setup" | "open" | "locked";
   participants: DashboardRow[];
   stats: { participants: number; medianPicks: number; uniquePicks: number };
 };
@@ -19,7 +17,7 @@ var body=d.querySelector('[data-rows]'),empty=d.querySelector('[data-empty]'),tb
 [].forEach.call(d.querySelectorAll('[data-stat]'),function(n){stat[n.dataset.stat]=n});
 function cell(tr,t,cls){var td=document.createElement('td');if(cls)td.className=cls;td.textContent=t;tr.append(td)}
 function draw(s){for(var k in stat)stat[k].textContent=s.stats[k];
-body.textContent='';s.participants.forEach(function(p){var tr=document.createElement('tr');cell(tr,p.name,'nm');cell(tr,p.submitTime,'mono');cell(tr,p.picks,'mono');body.append(tr)});
+body.textContent='';s.participants.forEach(function(p){var tr=document.createElement('tr');cell(tr,p.name,'nm');cell(tr,p.picks,'mono');body.append(tr)});
 empty.hidden=s.participants.length>0;tbl.hidden=!s.participants.length}
 function poll(){fetch(d.dataset.url,{headers:{accept:'application/json'},cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(s){
 if(s){draw(s);if(s.state==='locked'){location.reload();return}}setTimeout(poll,${POLL_MS})}).catch(function(){setTimeout(poll,${POLL_MS})})}
@@ -37,9 +35,9 @@ export const dashboardPanel = (status: DashboardStatus, statusUrl: string, live:
     <p class="small muted" data-empty ${participants.length ? "hidden" : ""}>${emptyText}</p>
     <div class="tablewrap scroll">
       <table class="t dash-table" aria-live="polite" aria-label="Participants" ${participants.length ? "" : "hidden"}>
-        <thead><tr><th scope="col">Name</th><th scope="col">Submit time (s)</th><th scope="col">Picks</th></tr></thead>
+        <thead><tr><th scope="col">Name</th><th scope="col">Picks</th></tr></thead>
         <tbody data-rows>${participants.map(
-          (p) => html`<tr><td class="nm">${p.name}</td><td class="mono">${p.submitTime}</td><td class="mono">${p.picks}</td></tr>`,
+          (p) => html`<tr><td class="nm">${p.name}</td><td class="mono">${p.picks}</td></tr>`,
         )}</tbody>
       </table>
     </div>

@@ -2,6 +2,8 @@ import { html, raw } from "hono/html";
 import { brandHead, CHROME_CSS, siteFooter, siteHeader } from "../ui/chrome";
 import { getLeaderboard } from "../leaderboard";
 import { getJargonResult } from "../jargon";
+import { organizerStrip } from "../organizer";
+import { playerStrip } from "../player-ui";
 import type { Session } from "../sessions";
 
 const LEADERBOARD_CSS = `
@@ -9,7 +11,7 @@ const LEADERBOARD_CSS = `
 body{margin:0;background:#F4EFE6;color:#17140F;font:400 15px/1.5 Archivo,system-ui,sans-serif}
 a{color:#1F2F63}a:hover{color:#8F2B22}
 a:focus-visible{outline:none;border-radius:2px;box-shadow:0 0 0 1.5px #1F2F63,0 0 0 4.5px rgba(31,47,99,.12)}
-.lb-page{display:flex;flex-direction:column;min-height:100vh}
+.lb-page{display:flex;flex-direction:column}
 .lb-jargon,.lb-board{padding:32px 24px;min-width:0}
 .lb-board{background:#1F2F63;color:#F4EFE6}
 .mono{font:400 11px/1.4 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#5F5648}
@@ -26,6 +28,7 @@ h1{font-size:26px}h2{font-size:22px}
 .words li.top::before{background:#E3C26E}
 .words b{font-weight:600;overflow-wrap:anywhere}
 .words .x{font:400 20px/1 Anton,Impact,sans-serif}
+.breakdown{margin-top:20px}.breakdown h2{font-size:16px;margin:0 0 8px}.breakdown details{border:1.5px solid #3C4E8A;border-radius:2px;margin-bottom:8px;padding:0 12px}.breakdown summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700}.pickvals{list-style:none;margin:0 0 10px;padding:0}.pickvals li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid #3C4E8A}.pickvals span{font:400 18px/1 Anton,Impact,sans-serif}.pickvals .muted{opacity:.7}
 .words .n{font:400 11px "JetBrains Mono",monospace;color:#5F5648;margin-right:10px}
 .rows{width:100%;border:0;border-collapse:collapse}
 .rows tbody{display:flex;flex-direction:column;gap:8px}
@@ -46,6 +49,11 @@ h1{font-size:26px}h2{font-size:22px}
 .winner .sc-c{font-size:44px;line-height:1}
 .recap{display:inline-flex;align-items:center;min-height:44px;margin-top:20px;padding:0 18px;border:1.5px solid #F4EFE6;border-radius:2px;font-weight:700;text-decoration:none}
 .sr{position:absolute;left:-9999px}
+.lb-toast{position:relative;z-index:10}
+.toast{position:absolute;top:0;left:0;right:0;margin:0;border:1.5px solid #17140F;border-radius:2px;background:#F4EFE6;color:#17140F;padding:10px 14px;font-size:14px;pointer-events:none;animation:toast-fade 6s ease-out forwards}
+.toast[role=status]{border-left:6px solid #1F2F63}
+@keyframes toast-fade{0%,66%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-6px);visibility:hidden}}
+@media(prefers-reduced-motion:reduce){.toast{animation-name:toast-fade-rm}@keyframes toast-fade-rm{0%,66%{opacity:1}100%{opacity:0;visibility:hidden}}}
 @media(min-width:900px){
 .lb-page{flex-direction:row}
 .lb-jargon{flex:1;padding:64px}
@@ -60,10 +68,13 @@ a:focus-visible{box-shadow:0 0 0 1.5px #1F2F63,0 0 0 5.5px rgba(31,47,99,.12)}
 }
 `;
 
-export const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer = false) => {
+const SCORED_TOAST = "Transcript processed and discarded. Jargon Result updated.";
+
+export const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer?: { token: string; scored: boolean }) => {
   const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
   const maxWord = Math.max(1, ...jargon.map((j) => j.occurrences));
   const topScore = Math.max(1, ...board.map((e) => e.score));
+  const values = new Map(board.flatMap((e) => e.picks.map((p) => [p.term, p.value] as const)));
   return html`<!doctype html>
 <html lang="en">
   <head>
@@ -77,7 +88,9 @@ export const leaderboardPage = async (db: D1Database, session: Session, recapUrl
     <style>${raw(LEADERBOARD_CSS)}${raw(CHROME_CSS)}</style>
   </head>
   <body>
-    ${siteHeader({ organizer })}
+    ${siteHeader()}
+    ${organizer ? organizerStrip(4) : playerStrip(3)}
+    <div class="lb-toast">${organizer?.scored ? html`<p class="toast" role="status">${SCORED_TOAST}</p>` : ""}</div>
     <main class="lb-page">
       <section class="lb-jargon" aria-labelledby="jargon-h">
         <div class="mono">Results · Jargon</div>
@@ -87,7 +100,7 @@ export const leaderboardPage = async (db: D1Database, session: Session, recapUrl
           : html`<ul class="words">
               ${jargon.map(
                 (j, i) =>
-                  html`<li class="${i === 0 ? "top" : ""}" style="--w:${Math.round((j.occurrences / maxWord) * 100)}%"><b>${j.term}</b><span><span class="n">${j.occurrences} picked</span><span class="x">×${j.occurrences}</span></span></li>`,
+                  html`<li class="${i === 0 ? "top" : ""}" style="--w:${Math.round((j.occurrences / maxWord) * 100)}%"><b>${j.term}</b><span><span class="n">worth ${values.get(j.term) ?? 0}</span><span class="x">×${j.occurrences}</span></span></li>`,
               )}
             </ul>`}
       </section>
@@ -105,7 +118,23 @@ export const leaderboardPage = async (db: D1Database, session: Session, recapUrl
                 )}
               </tbody>
             </table>`}
-        <a id="recap-link" class="recap" href="${recapUrl}">Recap Card (shareable PNG)</a>
+        <p class="small" id="scoring-note">Rarer terms, phrases and words said often (with diminishing returns) are worth more: solo picks and phrases earn the most.</p>
+        ${board.length === 0
+          ? ""
+          : html`<div class="breakdown" id="breakdown">
+              <h2>Your picks, one value each</h2>
+              ${board.map((e) => {
+                const said = e.picks.filter((p) => p.occurrences > 0);
+                const unsaid = e.picks.length - said.length;
+                return html`<details><summary>${e.displayName} · ${e.score}</summary>
+                  <ul class="pickvals">
+                    ${said.map((p) => html`<li><b>${p.term}</b><span>${p.value}</span></li>`)}
+                    ${unsaid > 0 ? html`<li class="muted"><b>${unsaid} ${unsaid === 1 ? "pick" : "picks"} never said</b><span>0</span></li>` : ""}
+                  </ul></details>`;
+              })}
+            </div>`}
+        <a id="recap-link" class="recap"href="${recapUrl}">Recap Card (shareable PNG)</a>
+        ${organizer ? html`<p class="small"><a id="rescore-link" href="/o/${organizer.token}?step=transcript">Upload a different transcript</a></p>` : ""}
       </section>
     </main>
     ${siteFooter()}
