@@ -1,24 +1,36 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { html, raw } from "hono/html";
 import { NONCE, secureHeaders } from "hono/secure-headers";
-import { errorCard, shell as uiShell } from "./ui/components";
-import { CHROME_CSS, brandHead, siteFooter, siteHeader } from "./ui/chrome";
 import { saveGrid, validateGrid } from "./grids";
-import { entryView, lockedView, submittedView, timesUpView, waitingView } from "./player-ui";
 import { getLeaderboard } from "./leaderboard";
-import { plansPage } from "./plans";
 import { renderRecapPng } from "./recap";
-import { organizerView } from "./organizer";
 import { qrSvg } from "./qr";
 import { getDashboardStatus } from "./dashboard";
 import { getJargonResult, processTranscript } from "./jargon";
 import {
-  countParticipants,
+  createForm,
+  entryView,
+  leaderboardPage,
+  lockedView,
+  notFoundPage,
+  notLocked,
+  notOpenYetPage,
+  organizersOnlyPage,
+  organizerView,
+  pickedWords,
+  PICK_PRESETS,
+  plansPage,
+  statusUrl,
+  submittedView,
+  timerInfo,
+  timesUpView,
+  tooManyRequestsPage,
+  waitingView,
+} from "./pages";
+import {
   createSession,
   findByInviteToken,
   findByOrganizerToken,
   lockSession,
-  MAX_PICK_COUNT,
   parsePickCount,
   parseSessionName,
   parseTimerSeconds,
@@ -31,6 +43,8 @@ import {
   type Session,
 } from "./sessions";
 
+// Routing only: each handler resolves the token, enforces the access guard, and hands rendering to ./pages.
+
 export type Bindings = { DB: D1Database; SESSIONS_LIMITER: RateLimit; INVITE_LIMITER: RateLimit };
 
 export const app = new Hono<{ Bindings: Bindings }>();
@@ -42,7 +56,7 @@ app.use(
     contentSecurityPolicy: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", NONCE],
-      styleSrc: ["'self'", NONCE,"https://fonts.googleapis.com"],
+      styleSrc: ["'self'", NONCE, "https://fonts.googleapis.com"],
       // style="" attributes can't carry nonces; attributes cannot run script, so this is a narrow compromise.
       styleSrcAttr: ["'unsafe-inline'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
@@ -101,252 +115,10 @@ const rateLimit =
 app.post("/sessions", rateLimit((e) => e.SESSIONS_LIMITER));
 app.post("/i/:token", rateLimit((e) => e.INVITE_LIMITER));
 
-const ZIGZAG =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 12L8 4L16 12' fill='none' stroke='%23D2432C' stroke-width='2.5'/%3E%3C/svg%3E\")";
-
-// Shared stylesheet (DESIGN.md direction 2A). Server-rendered and inline: no frontend framework.
-const CSS = `
-:root { --indigo:#1F2F63; --bone:#F4EFE6; --paper:#fff; --ink:#17140F; --muted:#5F5648; --placeholder:#8A8070; --red:#D2432C; --red-hover:#8F2B22; --raffia:#E3C26E; --ring:rgba(31,47,99,.12); }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--bone); color: var(--ink); font: 400 15px/1.5 Archivo, system-ui, sans-serif; overflow-x: hidden; }
-h1, h2, h3, p { margin: 0; }
-a { color: var(--red); }
-a:hover { color: var(--red-hover); }
-a:focus-visible, button:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
-.on-indigo a:focus-visible { outline-color: var(--raffia); }
-.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.mono.accent { color: var(--raffia); }
-.wrap { padding-left: 24px; padding-right: 24px; }
-.container { max-width: 1120px; margin: 0 auto; }
-.hero { display: flow-root; background: var(--indigo); color: var(--bone); padding-bottom: 32px; }
-.hero-grid { display: grid; gap: 28px; margin-top: 22px; }
-.hero-copy { display: flex; flex-direction: column; gap: 14px; }
-.hero h1 { font-weight: 800; font-size: 32px; line-height: 1.05; letter-spacing: -.01em; }
-.hero-copy p { font-size: 15px; color: var(--bone); }
-.hero-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
-.btn { display: block; border-radius: 2px; padding: 15px; text-align: center; font: 700 16px/1.3 Archivo, system-ui, sans-serif; text-decoration: none; cursor: pointer; border: 1.5px solid transparent; min-height: 48px; }
-.btn-red { background: var(--red); color: #fff; width: 100%; }
-.btn-red:hover { color: #fff; background: var(--red-hover); }
-.btn-outline { border-color: var(--ink); color: var(--ink); }
-.btn-outline:hover { color: var(--ink); }
-.btn-bone { border-color: var(--bone); color: var(--bone); }
-.btn-bone:hover { color: var(--bone); }
-.card { background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 2px; overflow: hidden; }
-.card-body { padding: 24px 20px; display: flex; flex-direction: column; gap: 22px; }
-.card h2 { font-weight: 800; font-size: 26px; line-height: 1.1; }
-.hint { font-size: 13px; line-height: 1.45; color: var(--muted); }
-.error { border: 1.5px solid var(--red); border-radius: 2px; padding: 12px 14px; font-weight: 600; }
-.pills { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.pills legend { padding: 0; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-.pills .row { display: flex; gap: 8px; }
-.pills label { flex: 1; cursor: pointer; position: relative; display: block; }
-.pills input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
-.pills span { display: block; text-align: center; min-height: 48px; line-height: 45px; padding: 0 8px; border: 1.5px solid var(--ink); border-radius: 2px; background: var(--paper); font-weight: 700; }
-.pills input:checked + span { background: var(--indigo); border-color: var(--indigo); color: #fff; }
-.pills input:focus-visible + span { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring), 0 0 0 5px var(--indigo); }
-.field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 700; }
-.field input { font: 400 15px Archivo, system-ui, sans-serif; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 2px; padding: 13px 14px; min-height: 52px; width: 100%; color: var(--ink); }
-.field .hint { font-weight: 400; }
-#custom-pick input { width: calc((100% - 16px) / 3); min-height: 48px; padding: 0 14px; }
-.field input::placeholder { color: var(--placeholder); }
-.field input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--ring); }
-.zig { height: 16px; background: ${ZIGZAG} repeat-x; margin: 0 -20px 8px; }
-.section { padding-top: 40px; padding-bottom: 8px; display: flex; flex-direction: column; gap: 24px; }
-.steps { display: flex; flex-direction: column; gap: 24px; }
-.step { display: flex; gap: 14px; }
-.step .n { font: 400 26px/1 Anton, Impact, sans-serif; color: var(--indigo); width: 22px; flex: none; }
-.step h3 { font-weight: 700; font-size: 15px; }
-.step p { font-size: 13px; line-height: 1.45; color: var(--muted); margin-top: 3px; }
-.who { padding-top: 32px; padding-bottom: 32px; display: flex; flex-direction: column; gap: 14px; }
-.who .card { padding: 16px; display: flex; flex-direction: column; gap: 4px; }
-.who h3 { font-weight: 800; font-size: 17px; }
-.who p { font-size: 13px; line-height: 1.45; color: var(--muted); }
-.band { background: var(--raffia); padding-top: 32px; padding-bottom: 32px; }
-.band .container { display: flex; flex-direction: column; gap: 14px; }
-.band h2 { font-weight: 800; font-size: 24px; line-height: 1.15; }
-.band .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.band .btn { padding: 13px 18px; font-size: 15px; width: auto; }
-.plain { padding-top: 32px; padding-bottom: 32px; max-width: 720px; margin: 0 auto; }
-@media (min-width: 900px) {
-  .wrap { padding-left: 80px; padding-right: 80px; }
-  .hero { padding-bottom: 88px; }
-  .hero-grid { grid-template-columns: 1.15fr 1fr; gap: 80px; align-items: center; margin-top: 40px; }
-  .hero-copy { gap: 22px; }
-  .hero h1 { font-size: 68px; line-height: 1.02; letter-spacing: -.02em; }
-  .hero-copy p { font-size: 19px; max-width: 520px; }
-  .hero-actions { flex-direction: row; gap: 14px; margin-top: 10px; }
-  .hero .btn { width: auto; padding: 17px 32px; font-size: 17px; }
-  .mono.accent { font-size: 13px; }
-  .card-body { padding: 36px 36px 28px; gap: 24px; }
-  .card h2 { font-size: 32px; }
-  .zig { margin: 0 -36px 8px; }
-  .field input { font-size: 16px; }
-  .pills .row { gap: 10px; }
-  #custom-pick input { width: calc((100% - 20px) / 3); }
-  .field input:focus { box-shadow: 0 0 0 4px var(--ring); }
-  .pills input:focus-visible + span { box-shadow: 0 0 0 4px var(--ring), 0 0 0 6px var(--indigo); }
-  .section { padding: 80px 0; display: grid; grid-template-columns: 1fr 2fr; gap: 64px; }
-  .section h2 { font-weight: 800; font-size: 34px; line-height: 1.1; margin-top: 12px; }
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
-  .step { flex-direction: column; gap: 10px; }
-  .step .n { font-size: 44px; width: auto; }
-  .step h3 { font-size: 18px; }
-  .step p { font-size: 14px; line-height: 1.5; margin-top: 0; }
-  .who { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; padding: 0 0 80px; }
-  .who .mono { grid-column: 1 / -1; }
-  .who .card { padding: 32px; gap: 8px; }
-  .who h3 { font-size: 24px; }
-  .who p { font-size: 15px; line-height: 1.5; }
-  .band { padding-top: 56px; padding-bottom: 56px; }
-  .band .container { flex-direction: row; align-items: center; justify-content: space-between; }
-  .band h2 { font-size: 34px; line-height: 1.1; }
-  .band .btn { padding: 16px 28px; font-size: 16px; }
-}
-`;
-
-// Other pages get a plain readable column until they are restyled; the landing page is full-bleed (bare).
-const page = (title: string, content: unknown, bare = false, head?: unknown) => {
-  const body = bare ? content : html`<main class="plain wrap">${content}</main>`;
-  return shell(title, body, head);
-};
-
-const LANDING_TITLE = "MumbahJumbah: Predict the jargon. Win the meeting.";
-const LANDING_DESCRIPTION = "Reverse bingo for meetings. Pick the buzzwords you think will be said, then see who called it.";
-const SOCIAL_HEAD = html`<meta name="description" content="${LANDING_DESCRIPTION}" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="MumbahJumbah" />
-    <meta property="og:title" content="${LANDING_TITLE}" />
-    <meta property="og:description" content="${LANDING_DESCRIPTION}" />
-    <meta property="og:url" content="https://mumbahjumbah.com/" />
-    <meta property="og:image" content="https://mumbahjumbah.com/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />`;
-
-const shell = (title: string, body: unknown, head?: unknown) => html`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${title}</title>
-    ${brandHead()}
-    ${head ?? ""}
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap"
-    />
-    <style>
-      ${raw(CSS)}${raw(CHROME_CSS)}
-    </style>
-  </head>
-  <body>
-    ${siteHeader()}
-    ${body}
-    ${siteFooter()}
-  </body>
-</html>`;
-
 app.get("/health", async (c) => {
   await c.env.DB.prepare("SELECT 1").first();
   return c.json({ status: "ok" });
 });
-
-const PICK_PRESETS = ["5", "10"] as const;
-
-// Pills are radio inputs, so the form works without JS.
-const createForm = (error?: string) =>
-  page(
-    LANDING_TITLE,
-    html`<header class="hero on-indigo">
-        <div class="wrap">
-          <div class="container">
-            <div class="hero-grid">
-              <div class="hero-copy">
-                <div class="mono accent">Reverse bingo for meetings</div>
-                <h1>Predict the jargon. Win the meeting.</h1>
-                <p>Guess the buzzwords before the call. Get scored against the transcript after.</p>
-                <div class="hero-actions">
-                  <a class="btn btn-bone" href="#how">See how it works</a>
-                </div>
-              </div>
-              <div class="card" id="new">
-                <form method="post" action="/sessions" class="card-body">
-                  <h2>New session</h2>
-                  ${error ? html`<p class="error" role="alert">${error}</p>` : ""}
-                  <fieldset class="pills">
-                    <legend>Maximum picks</legend>
-                    <div class="row">
-                      <label><input type="radio" name="pick_preset" id="pick-custom" value="custom" checked /><span>Custom</span></label>
-                      ${PICK_PRESETS.map(
-                        (n) => html`<label><input type="radio" name="pick_preset" value="${n}" /><span>${n}</span></label>`,
-                      )}
-                    </div>
-                  </fieldset>
-                  <label class="field" id="custom-pick">
-                    <input type="number" name="pick_count" min="1" max="${MAX_PICK_COUNT}" step="1" value="7" inputmode="numeric" aria-label="Maximum picks" />
-                    <span class="hint">Choose between 1 and ${MAX_PICK_COUNT}.</span>
-                  </label>
-                  <div>
-                    <div class="zig" aria-hidden="true"></div>
-                    <button type="submit" class="btn btn-red">Create Session</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-      <main>
-        <section class="wrap" id="how">
-          <div class="container section">
-            <div>
-              <div class="mono">How it works</div>
-              <h2>Three steps. One of them is a meeting.</h2>
-            </div>
-            <div class="steps">
-              <div class="step"><span class="n">1</span><div><h3>Create a session</h3><p>Set the most words each player can pick. Share the invite link.</p></div></div>
-              <div class="step"><span class="n">2</span><div><h3>Everyone predicts</h3><p>Each player locks in their jargon picks before the call.</p></div></div>
-              <div class="step"><span class="n">3</span><div><h3>Meeting, then scores</h3><p>Upload the transcript after. The leaderboard writes itself.</p></div></div>
-            </div>
-          </div>
-        </section>
-        <section class="wrap">
-          <div class="container who">
-            <div class="mono" id="privacy">Privacy</div>
-            <div class="card"><p>Transcripts are never saved. That is our mojo!</p></div>
-            <div class="card"><p>Picks and results are only saved as long as your session is live and open.</p></div>
-            <div class="card"><p>Game telemetry is collected for logs without personal data.</p></div>
-          </div>
-        </section>
-        <section class="band wrap">
-          <div class="container">
-            <h2>C’mon, get your mumbah-jumbah together!</h2>
-            <div class="actions"><a class="btn btn-red" href="#new">Create a session</a></div>
-          </div>
-        </section>
-      </main>
-      <script>
-        // The number input is always visible: picking 5 or 10 fills it in, typing in it switches back to Custom.
-        // Without JS the checked preset wins on the server, so the form still works.
-        (function () {
-          var form = document.querySelector('form[action="/sessions"]');
-          var input = form.querySelector('input[name="pick_count"]');
-          var custom = form.querySelector("#pick-custom");
-          form.addEventListener("change", function (e) {
-            var t = e.target;
-            if (t && t.name === "pick_preset" && t.value !== "custom") input.value = t.value;
-          });
-          input.addEventListener("input", function () {
-            custom.checked = true;
-          });
-        })();
-      </script>`,
-    true,
-    SOCIAL_HEAD,
-  );
 
 app.get("/", (c) => c.html(createForm()));
 
@@ -367,94 +139,6 @@ app.post("/sessions", async (c) => {
   // Straight to the Organizer page, where the Session Name is set and the Invite Link then appears.
   return c.redirect(`/o/${session.organizer_link_token}`, 303);
 });
-
-const errorCss = `
-*{box-sizing:border-box}
-body{margin:0;background:#F4EFE6;color:#17140F;font-family:'Archivo',system-ui,sans-serif;}
-.error-card{margin:32px auto}
-.error-card{width:100%;max-width:420px;border:1.5px solid #17140F;border-radius:2px;overflow:hidden;background:#F4EFE6;display:flex;flex-direction:column}
-.error-card header{background:#1F2F63;color:#F4EFE6;padding:24px;display:flex;flex-direction:column;gap:6px}
-.error-code{font-family:'Anton',sans-serif;font-size:56px;line-height:1;color:#E3C26E}
-.error-card h1{margin:0;font-weight:800;font-size:20px;line-height:1.15;overflow-wrap:anywhere}
-.error-body{padding:20px 24px 24px;display:flex;flex-direction:column;gap:16px}
-.error-body p{margin:0;font-size:14px;line-height:1.5;color:#5F5648}
-.error-actions{display:flex;flex-direction:column;gap:8px}
-.error-action{display:block;min-height:44px;border:1.5px solid #17140F;border-radius:2px;padding:12px;text-align:center;font-weight:700;font-size:14px;background:#fff;color:#17140F;text-decoration:none}
-.error-action:hover{color:#8F2B22}
-`;
-
-const errorPage = (
-  title: string,
-  code: string,
-  headline: string,
-  message: string,
-  actions: { href: string; label: string }[],
-) => html`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${title}</title>
-    ${brandHead()}
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;700;800&display=swap" rel="stylesheet" />
-    <style>${raw(errorCss)}${raw(CHROME_CSS)}</style>
-  </head>
-  <body>
-    ${siteHeader()}
-    <main class="error-card">
-      <header><span class="error-code">${code}</span><h1>${headline}</h1></header>
-      <div class="error-body">
-        <p>${message}</p>
-        <div class="error-actions">
-          ${actions.map((a) => html`<a class="error-action" href="${a.href}">${a.label}</a>`)}
-        </div>
-      </div>
-    </main>
-    ${siteFooter()}
-  </body>
-</html>`;
-
-const notFoundPage = () =>
-  errorPage(
-    "Not found",
-    "404",
-    "That link doesn’t go anywhere.",
-    "Either it was mistyped or the session was cleared. Ask your organizer for a fresh one.",
-    [{ href: "/", label: "Back to start" }],
-  );
-
-const tooManyRequestsPage = () =>
-  errorPage(
-    "Slow down",
-    "429",
-    "Easy there. Too many requests.",
-    "You’ve hit the limit for now. Wait a minute, then try again.",
-    [{ href: "/", label: "Back to start" }],
-  );
-
-// An Invite Link opened before the Organizer has saved a Session Name: a friendly 403, never a 404 or a pick form.
-const notOpenYetPage = () =>
-  uiShell(
-    "Not open yet",
-    errorCard("SOON", "This session isn’t open yet.", "The organizer hasn’t finished setting it up. Check back in a minute.", {
-      href: "",
-      label: "Try again",
-    }),
-  );
-
-const statusUrl = (s: Session) => `/i/${s.invite_link_token}/status`;
-
-// Only meaningful while the timer runs; `now` is the server clock the client derives its offset from.
-const timerInfo = (s: Session, now: number) => ({
-  endsAt: Date.parse(s.timer_ends_at ?? ""),
-  seconds: s.timer_seconds ?? 0,
-  now,
-  statusUrl: statusUrl(s),
-});
-
-const pickedWords = (raw: Record<string, unknown>) => [raw["pick"]].flat().filter((p): p is string => typeof p === "string");
 
 // Small JSON status for the participant pages (waiting screen and countdown). Never cached (see the /i/ rule above).
 app.get("/i/:token/status", async (c) => {
@@ -513,15 +197,6 @@ app.post("/i/:token", async (c) => {
   }
   return c.html(submittedView(session.id, result.value.email, result.value.displayName, result.value.picks, session.name));
 });
-
-const organizersOnlyPage = (inviteToken: string) =>
-  uiShell(
-    "Organizers only",
-    errorCard("403", "Organizers only.", raw("This page needs the private organizer link. The invite link won't open it."), {
-      href: `/i/${inviteToken}`,
-      label: "Use the invite link",
-    }),
-  );
 
 // Organizer routes: an Invite Link token where the Organizer Link is required is a 403 (wrong link type);
 // any other unknown token stays a 404. Distinct from the locked-Session 403 on the invite routes.
@@ -633,118 +308,6 @@ app.post("/o/:token/transcript", async (c) => {
   if (!res.ok) return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin, { error: res.error }), 400);
   return c.html(await organizerView(c.env.DB, session, token, new URL(c.req.url).origin, { ok: "Transcript processed and discarded. Jargon Result updated." }));
 });
-
-const LEADERBOARD_CSS = `
-*{box-sizing:border-box}
-body{margin:0;background:#F4EFE6;color:#17140F;font:400 15px/1.5 Archivo,system-ui,sans-serif}
-a{color:#1F2F63}a:hover{color:#8F2B22}
-a:focus-visible{outline:none;border-radius:2px;box-shadow:0 0 0 1.5px #1F2F63,0 0 0 4.5px rgba(31,47,99,.12)}
-.lb-page{display:flex;flex-direction:column;min-height:100vh}
-.lb-jargon,.lb-board{padding:32px 24px;min-width:0}
-.lb-board{background:#1F2F63;color:#F4EFE6}
-.mono{font:400 11px/1.4 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#5F5648}
-.lb-board .mono{color:#E3C26E}
-h1,h2{font-weight:800;line-height:1.1;margin:6px 0 16px;overflow-wrap:anywhere}
-h1{font-size:26px}h2{font-size:22px}
-.lb-board a{color:#F4EFE6}
-.lb-board a:focus-visible{box-shadow:0 0 0 1.5px #F4EFE6,0 0 0 4.5px rgba(244,239,230,.35)}
-.note{font-size:13px;color:#5F5648;margin:0 0 16px}
-.words{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-.words li{position:relative;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;padding:0 14px;background:#fff;border:1.5px solid #17140F;border-radius:2px;overflow:hidden}
-.words li>*{position:relative}
-.words li::before{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:#ECE4D2}
-.words li.top::before{background:#E3C26E}
-.words b{font-weight:600;overflow-wrap:anywhere}
-.words .x{font:400 20px/1 Anton,Impact,sans-serif}
-.words .n{font:400 11px "JetBrains Mono",monospace;color:#5F5648;margin-right:10px}
-.rows{width:100%;border:0;border-collapse:collapse}
-.rows tbody{display:flex;flex-direction:column;gap:8px}
-.rows .row{position:relative;display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:8px;min-height:38px;padding:0 14px;background:#172352;border:1.5px solid #3C4E8A;border-radius:2px;overflow:hidden}
-.rows .row>td{position:relative;min-width:0;padding:0}
-.rows .row::before{content:"";position:absolute;inset:0 auto 0 0;width:var(--w);background:#2B3F7A}
-.rows .row.podium{border-color:#E3C26E}
-.rows .row.podium::before{background:#7A6A3A}
-.rows .row.winner{background:#E3C26E;border-color:#E3C26E;color:#17140F;min-height:84px;padding:14px 16px;grid-template-columns:56px 1fr auto;gap:16px}
-.rows .row.winner::before{display:none}
-.rk-n{font:400 12px "JetBrains Mono",monospace;opacity:.7}
-.podium .rk-n{font:400 22px Anton,Impact,sans-serif;color:#E3C26E;opacity:1}
-.winner .rk-n{font:400 56px/1 Anton,Impact,sans-serif;color:#17140F;opacity:1}
-.nm-c{font-weight:600;font-size:14px;overflow-wrap:anywhere}
-.winner .nm-c{font-weight:800;font-size:20px}
-.winner .nm-c::before{content:"Top predictor";display:block;font:400 10px "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase}
-.sc-c{font:400 18px Anton,Impact,sans-serif}
-.winner .sc-c{font-size:44px;line-height:1}
-.recap{display:inline-flex;align-items:center;min-height:44px;margin-top:20px;padding:0 18px;border:1.5px solid #F4EFE6;border-radius:2px;font-weight:700;text-decoration:none}
-.sr{position:absolute;left:-9999px}
-@media(min-width:900px){
-.lb-page{flex-direction:row}
-.lb-jargon{flex:1;padding:64px}
-.lb-board{flex:0 0 520px;padding:64px}
-h1{font-size:34px}
-a:focus-visible{box-shadow:0 0 0 1.5px #1F2F63,0 0 0 5.5px rgba(31,47,99,.12)}
-.lb-board a:focus-visible{box-shadow:0 0 0 1.5px #F4EFE6,0 0 0 5.5px rgba(244,239,230,.35)}
-.rows .row{min-height:46px}
-.rows .row.winner{min-height:84px}
-.sc-c{font-size:22px}
-.winner .sc-c{font-size:44px}
-}
-`;
-
-const leaderboardPage = async (db: D1Database, session: Session, recapUrl: string, organizer = false) => {
-  const [board, jargon] = await Promise.all([getLeaderboard(db, session.id), getJargonResult(db, session.id)]);
-  const maxWord = Math.max(1, ...jargon.map((j) => j.occurrences));
-  const topScore = Math.max(1, ...board.map((e) => e.score));
-  return html`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Leaderboard</title>
-    ${brandHead()}
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet" />
-    <style>${raw(LEADERBOARD_CSS)}${raw(CHROME_CSS)}</style>
-  </head>
-  <body>
-    ${siteHeader({ organizer })}
-    <main class="lb-page">
-      <section class="lb-jargon" aria-labelledby="jargon-h">
-        <div class="mono">Results · Jargon</div>
-        <h2 id="jargon-h">What was actually said</h2>
-        ${jargon.length === 0
-          ? html`<p class="note">No Jargon Result yet (or no picked term was said), so everyone is at 0 for now.</p>`
-          : html`<ul class="words">
-              ${jargon.map(
-                (j, i) =>
-                  html`<li class="${i === 0 ? "top" : ""}" style="--w:${Math.round((j.occurrences / maxWord) * 100)}%"><b>${j.term}</b><span><span class="n">${j.occurrences} picked</span><span class="x">×${j.occurrences}</span></span></li>`,
-              )}
-            </ul>`}
-      </section>
-      <section class="lb-board" aria-labelledby="lb-h">
-        <div class="mono">${session.name ?? `Session ${session.id}`}</div>
-        <h1 id="lb-h">Leaderboard: ${session.name ?? `Session ${session.id}`}</h1>
-        ${board.length === 0
-          ? html`<p>No Grids were submitted.</p>`
-          : html`<table class="rows" role="table">
-              <thead class="sr"><tr><th>Rank</th><th>Participant</th><th>Score</th></tr></thead>
-              <tbody role="rowgroup">
-                ${board.map(
-                  (e) =>
-                    html`<tr class="row${e.rank === 1 ? " winner" : e.rank <= 3 ? " podium" : ""}" role="row" style="--w:${Math.round((e.score / topScore) * 100)}%"><td class="rk-n">${e.rank}</td><td class="nm-c">${e.displayName}</td><td class="sc-c">${e.score}</td></tr>`,
-                )}
-              </tbody>
-            </table>`}
-        <a id="recap-link" class="recap" href="${recapUrl}">Recap Card (shareable PNG)</a>
-      </section>
-    </main>
-    ${siteFooter()}
-  </body>
-</html>`;
-};
-
-const notLocked = () =>
-  page("Leaderboard not ready", html`<h1>Leaderboard not ready</h1><p>The leaderboard appears once the Organizer has locked the Session and uploaded a Transcript.</p>`);
 
 // Each route resolves only its own token type, so neither link grants the other's capabilities.
 app.get("/i/:token/leaderboard", async (c) => {
