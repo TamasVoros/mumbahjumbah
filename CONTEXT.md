@@ -80,6 +80,10 @@ _Avoid_: Report, presentation (implies more design work than this is)
 The capability for an Operator to render Recap Cards (and Recap Decks) with its own branding instead of MumbahJumbah's. The basis of the facilitator business model — the facilitator is the Operator, their client sees their branding, not MumbahJumbah's.
 _Avoid_: Custom branding, theming (White-Label is the canonical term — it's the named business-model capability, not a generic styling feature)
 
+## Module map
+
+Where code lives (Gameplay, Sessions and links, Identity and operators, Recap and sharing, Pages and design, Storage): see [ADR-0004](docs/adr/0004-module-map.md).
+
 ## Relationships
 
 - An **Operator** owns one or more **Sessions**; an **Organizer** belongs to exactly one **Operator** and creates **Sessions** on its behalf (v1: one Operator, who is also the sole Organizer)
