@@ -13,7 +13,14 @@ export default defineConfig(async () => {
           plugins: [
             cloudflareTest({
               wrangler: { configPath: "./wrangler.jsonc" },
-              miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+              miniflare: {
+                bindings: { TEST_MIGRATIONS: migrations },
+                // Effectively unlimited so the suite isn't throttled; limiter behaviour is tested with mocks.
+                ratelimits: {
+                  SESSIONS_LIMITER: { namespace_id: "1001", simple: { limit: 1000000, period: 60 } },
+                  INVITE_LIMITER: { namespace_id: "1002", simple: { limit: 1000000, period: 60 } },
+                },
+              },
             }),
           ],
           test: {

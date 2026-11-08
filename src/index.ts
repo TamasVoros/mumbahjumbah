@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { html, raw } from "hono/html";
 import { secureHeaders } from "hono/secure-headers";
 import { errorCard, shell as uiShell } from "./ui/components";
@@ -31,7 +31,7 @@ import {
   type Session,
 } from "./sessions";
 
-export type Bindings = { DB: D1Database };
+export type Bindings = { DB: D1Database; SESSIONS_LIMITER: RateLimit; INVITE_LIMITER: RateLimit };
 
 export const app = new Hono<{ Bindings: Bindings }>();
 
@@ -65,6 +65,26 @@ app.use("*", async (c, next) => {
     c.res.headers.set("Cache-Control", "no-store");
   }
 });
+
+// Rate limiting (Workers Rate Limiting binding), keyed by client IP. /health is deliberately unlimited.
+const RATE_LIMIT_RETRY_AFTER_SECONDS = "60";
+const rateLimit =
+  (pick: (env: Bindings) => RateLimit | undefined): MiddlewareHandler<{ Bindings: Bindings }> =>
+  async (c, next) => {
+    const limiter = pick(c.env);
+    if (limiter) {
+      const key = c.req.header("CF-Connecting-IP") ?? "unknown";
+      const { success } = await limiter.limit({ key });
+      if (!success) {
+        c.header("Retry-After", RATE_LIMIT_RETRY_AFTER_SECONDS);
+        c.header("Cache-Control", "no-store");
+        return c.html(tooManyRequestsPage(), 429);
+      }
+    }
+    await next();
+  };
+app.post("/sessions", rateLimit((e) => e.SESSIONS_LIMITER));
+app.post("/i/:token", rateLimit((e) => e.INVITE_LIMITER));
 
 const ZIGZAG =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M0 12L8 4L16 12' fill='none' stroke='%23D2432C' stroke-width='2.5'/%3E%3C/svg%3E\")";
@@ -387,6 +407,15 @@ const notFoundPage = () =>
     "404",
     "That link doesn’t go anywhere.",
     "Either it was mistyped or the session was cleared. Ask your organizer for a fresh one.",
+    [{ href: "/", label: "Back to start" }],
+  );
+
+const tooManyRequestsPage = () =>
+  errorPage(
+    "Slow down",
+    "429",
+    "Easy there. Too many requests.",
+    "You’ve hit the limit for now. Wait a minute, then try again.",
     [{ href: "/", label: "Back to start" }],
   );
 
