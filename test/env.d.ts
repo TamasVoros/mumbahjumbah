@@ -5,6 +5,8 @@ declare global {
     interface Env {
       DB: D1Database;
       ASSETS: Fetcher;
+      SESSIONS_LIMITER: RateLimit;
+      INVITE_LIMITER: RateLimit;
       TEST_MIGRATIONS: D1Migration[];
     }
   }
